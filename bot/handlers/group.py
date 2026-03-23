@@ -2,10 +2,8 @@
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.db.models import Tournament, UserCard, UserSquad
+from bot.db.models import UserCard, UserSquad
 from bot.db.session import AsyncSessionLocal
 from bot.services.stats import (
     format_scorers,
@@ -36,55 +34,44 @@ async def cmd_alltime(message: Message) -> None:
 
 @router.message(Command("top"))
 async def cmd_top(message: Message) -> None:
-    """Лучшие бомбардиры за всё время."""
+    """Лучшие бомбардиры и ассистенты за всё время."""
     async with AsyncSessionLocal() as session:
-        rows = await get_top_scorers(session, limit=10)
-    await message.reply(format_scorers(rows, "⚽ Лучшие бомбардиры всех времён"), parse_mode="Markdown")
+        scorers = await get_top_scorers(session, limit=10)
+        assisters = await get_top_assisters(session, limit=10)
+    text = format_scorers(scorers, "⚽ Бомбардиры всех времён")
+    text += "\n\n" + format_scorers(assisters, "🎯 Ассистенты всех времён")
+    await message.reply(text, parse_mode="Markdown")
 
 
 @router.message(Command("topweek"))
 async def cmd_topweek(message: Message) -> None:
-    """Лучшие бомбардиры текущего турнира."""
+    """Лучшие бомбардиры и ассистенты текущего турнира."""
     async with AsyncSessionLocal() as session:
         tournament = await get_or_create_tournament(session)
-        rows = await get_top_scorers(session, limit=10, tournament_id=tournament.id)
-    await message.reply(format_scorers(rows, "⚽ Лучшие бомбардиры этой недели"), parse_mode="Markdown")
-
-
-@router.message(Command("topassists"))
-async def cmd_topassists(message: Message) -> None:
-    """Лучшие ассистенты за всё время."""
-    async with AsyncSessionLocal() as session:
-        rows = await get_top_assisters(session, limit=10)
-    await message.reply(format_scorers(rows, "🎯 Лучшие ассистенты всех времён"), parse_mode="Markdown")
+        scorers = await get_top_scorers(session, limit=10, tournament_id=tournament.id)
+        assisters = await get_top_assisters(session, limit=10, tournament_id=tournament.id)
+    text = format_scorers(scorers, "⚽ Бомбардиры этой недели")
+    text += "\n\n" + format_scorers(assisters, "🎯 Ассистенты этой недели")
+    await message.reply(text, parse_mode="Markdown")
 
 
 @router.message(Command("myteam"))
 async def cmd_myteam(message: Message) -> None:
-    """Показать текущий состав (свой или @упомянутого игрока)."""
+    """Показать текущий состав."""
     user_id = message.from_user.id
-
-    # Если есть упомянутый пользователь в тексте — его команда
-    if message.entities:
-        for entity in message.entities:
-            if entity.type == "mention":
-                username = message.text[entity.offset + 1: entity.offset + entity.length]
-                # Ищем по username в whitelist — упрощённо просто берём своё
-                break
 
     async with AsyncSessionLocal() as session:
         squad = await session.get(UserSquad, user_id)
-        formation = squad.formation if squad else "4-4-2"
-        slots = squad.slot_assignments if squad else {}
-
-        if not slots:
-            await message.reply("Состав не настроен. Используй /squad в личных сообщениях с ботом.")
+        if not squad or not squad.slot_assignments:
+            await message.reply("Состав не настроен. Настрой через кнопку Menu в личке с ботом.")
             return
 
-        lines = [f"🏟 Схема: {formation}\n"]
-        for slot, card_id in sorted(slots.items()):
+        lines = [f"🏟 Схема: {squad.formation}\n"]
+        for slot, card_id in sorted(squad.slot_assignments.items()):
             card = await session.get(UserCard, card_id)
             if card:
-                lines.append(f"  {slot}: {card.player.name} — {card.player.overall_rating} ⭐")
+                r = card.player.overall_rating
+                icon = "👑" if r >= 90 else "🌟" if r >= 85 else "⭐"
+                lines.append(f"  {slot}: {card.player.name} — {r}{icon}")
 
     await message.reply("\n".join(lines))

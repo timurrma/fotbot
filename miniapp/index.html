@@ -456,6 +456,8 @@ let squad = {};          // {slot: card_id}
 let formation = '4-4-2';
 let selectedSlot = null; // slot name user clicked
 let posFilter = 'ALL';
+let pageSize = 20;
+let visibleCount = pageSize;
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
@@ -669,7 +671,7 @@ function renderFilterRow() {
     const btn = document.createElement('button');
     btn.className = 'pos-filter' + (pos === posFilter ? ' active' : '');
     btn.textContent = pos;
-    btn.onclick = () => { posFilter = pos; renderFilterRow(); renderPlayerList(); };
+    btn.onclick = () => { posFilter = pos; visibleCount = pageSize; renderFilterRow(); renderPlayerList(); };
     row.appendChild(btn);
   }
 }
@@ -690,10 +692,19 @@ function renderPlayerList() {
     return;
   }
 
-  for (const card of filtered) {
+  const visible = filtered.slice(0, visibleCount);
+  for (const card of visible) {
     const inSquad = assignedCardIds.has(card.id) && squad[selectedSlot] !== card.id;
     const isSelected = selectedSlot && squad[selectedSlot] === card.id;
     list.appendChild(makeCardEl(card, inSquad, isSelected));
+  }
+
+  if (visibleCount < filtered.length) {
+    const btn = document.createElement('button');
+    btn.textContent = `Ещё ${Math.min(pageSize, filtered.length - visibleCount)} из ${filtered.length}`;
+    btn.style.cssText = 'width:100%;padding:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#94a3b8;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px;';
+    btn.onclick = () => { visibleCount += pageSize; renderPlayerList(); };
+    list.appendChild(btn);
   }
 }
 
