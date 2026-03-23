@@ -18,7 +18,9 @@
       "Bash(git remote:*)",
       "Bash(git add:*)",
       "Bash(git rm:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(python3 -m pip install asyncpg==0.30.0 -q)"
     ]
   }
 }
