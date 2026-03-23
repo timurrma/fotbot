@@ -117,12 +117,16 @@ def compute_penalty(player: Player, slot_position: str) -> int:
 def build_lineup(
     formation: str,
     cards: list[tuple[int, Player]],  # [(user_card_id, Player), ...]
+    slot_positions: Optional[list] = None,  # реальные позиции слотов если переданы
 ) -> list[PlayerSlot]:
     """Создаёт расстановку из списка карточек и схемы."""
-    slots_positions = FORMATIONS_SLOTS.get(formation, FORMATIONS_SLOTS["4-4-2"])
+    fallback_positions = FORMATIONS_SLOTS.get(formation, FORMATIONS_SLOTS["4-4-2"])
     lineup = []
     for i, (card_id, player) in enumerate(cards[:11]):
-        slot_pos = slots_positions[i] if i < len(slots_positions) else "CM"
+        if slot_positions and i < len(slot_positions):
+            slot_pos = slot_positions[i]
+        else:
+            slot_pos = fallback_positions[i] if i < len(fallback_positions) else "CM"
         lineup.append(PlayerSlot(
             slot_position=slot_pos,
             player=player,
@@ -368,13 +372,15 @@ def simulate_match(
     home_cards: list[tuple[int, Player]],
     away_formation: str,
     away_cards: list[tuple[int, Player]],
+    home_slot_positions: Optional[list] = None,
+    away_slot_positions: Optional[list] = None,
 ) -> MatchResult:
     """
     Основная функция симуляции матча.
     Принимает составы двух команд, возвращает MatchResult.
     """
-    home_lineup = build_lineup(home_formation, home_cards)
-    away_lineup = build_lineup(away_formation, away_cards)
+    home_lineup = build_lineup(home_formation, home_cards, home_slot_positions)
+    away_lineup = build_lineup(away_formation, away_cards, away_slot_positions)
 
     h_str = team_strength(home_lineup)
     a_str = team_strength(away_lineup)

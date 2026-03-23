@@ -19,7 +19,7 @@ from bot.config import settings
 from bot.db.models import Match, MatchStat, Tournament, UserCard, UserSquad, Whitelist
 from bot.db.session import AsyncSessionLocal
 from bot.services.llm_commentator import commentate_match, format_match_summary
-from bot.services.simulation import events_to_dict, simulate_match
+from bot.services.simulation import events_to_dict, simulate_match, FORMATIONS_SLOTS
 
 
 async def _get_squad_cards(
@@ -65,7 +65,6 @@ async def _get_squad_cards(
 
         # Если меньше 11 — добиваем пустые слоты фантомным игроком рейтинг 40
         if len(cards) < 11:
-            from bot.services.simulation import FORMATIONS_SLOTS
             formation_slots = FORMATIONS_SLOTS.get(formation, FORMATIONS_SLOTS["4-4-2"])
             filled_count = len(cards)
             for i in range(filled_count, 11):
@@ -78,7 +77,8 @@ async def _get_squad_cards(
                 )
                 cards.append((-1, phantom, slot_pos))
 
-        return formation, [(cid, p) for cid, p, sp in cards[:11]]
+        slot_pos_list = [sp for cid, p, sp in cards[:11]]
+        return formation, [(cid, p) for cid, p, sp in cards[:11]], slot_pos_list
 
     # Фоллбэк: топ-11 по рейтингу
     from sqlalchemy import desc
@@ -92,7 +92,9 @@ async def _get_squad_cards(
         .options(joinedload(UserCard.player))
     )
     cards_raw = result.scalars().all()
-    return "4-4-2", [(c.id, c.player) for c in cards_raw]
+    fallback_slots = FORMATIONS_SLOTS.get("4-4-2")
+    slot_pos_list = [fallback_slots[i] if i < len(fallback_slots) else "CM" for i in range(len(cards_raw))]
+    return "4-4-2", [(c.id, c.player) for c in cards_raw], slot_pos_list
 
 
 async def get_or_create_tournament(session: AsyncSession) -> Tournament:
@@ -203,8 +205,8 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         if not match:
             return False
 
-        home_formation, home_cards = await _get_squad_cards(session, match.home_user_id)
-        away_formation, away_cards = await _get_squad_cards(session, match.away_user_id)
+        home_formation, home_cards, home_slot_pos = await _get_squad_cards(session, match.home_user_id)
+        away_formation, away_cards, away_slot_pos = await _get_squad_cards(session, match.away_user_id)
 
         if not home_cards or not away_cards:
             return False
@@ -221,7 +223,7 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         )
         await asyncio.sleep(1)
 
-        result = simulate_match(home_formation, home_cards, away_formation, away_cards)
+        result = simulate_match(home_formation, home_cards, away_formation, away_cards, home_slot_pos, away_slot_pos)
         # Маппинг card_id → owner для комментатора
         card_owner = {card_id: _home_name for card_id, _ in home_cards}
         card_owner.update({card_id: _away_name for card_id, _ in away_cards})
@@ -337,13 +339,13 @@ async def auto_announce_results(bot: Bot) -> None:
         await asyncio.sleep(1)
 
         for match in unplayed:
-            home_formation, home_cards = await _get_squad_cards(session, match.home_user_id)
-            away_formation, away_cards = await _get_squad_cards(session, match.away_user_id)
+            home_formation, home_cards, home_slot_pos = await _get_squad_cards(session, match.home_user_id)
+            away_formation, away_cards, away_slot_pos = await _get_squad_cards(session, match.away_user_id)
 
             if not home_cards or not away_cards:
                 continue
 
-            sim_result = simulate_match(home_formation, home_cards, away_formation, away_cards)
+            sim_result = simulate_match(home_formation, home_cards, away_formation, away_cards, home_slot_pos, away_slot_pos)
             events_data = events_to_dict(sim_result.events)
 
             match.home_goals = sim_result.home_goals
