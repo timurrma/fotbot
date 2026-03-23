@@ -1,5 +1,5 @@
 """Команды в групповом чате."""
-from aiogram import Router
+from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
@@ -15,13 +15,10 @@ from bot.services.tournament import build_standings_text, get_or_create_tourname
 router = Router()
 
 
-@router.message(Command("start"))
+@router.message(Command("start"), F.chat.type.in_({"group", "supergroup"}))
 async def cmd_start_group(message: Message) -> None:
     """Отвечаем на /start в группе — просим написать в ЛС."""
-    await message.reply(
-        "👋 Привет! Напиши мне в личные сообщения, чтобы начать игру.",
-        parse_mode=None,
-    )
+    await message.reply("👋 Привет! Напиши мне в личные сообщения, чтобы начать игру.")
 
 
 @router.message(Command("standings"))
