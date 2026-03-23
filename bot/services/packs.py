@@ -28,7 +28,7 @@ PACK_WEIGHTS = {
     },
     "starter": {
         "ranges": [(65, 74), (75, 84), (85, 99)],
-        "weights": [65, 27, 8],
+        "weights": [90, 10, 0],
     },
 }
 
