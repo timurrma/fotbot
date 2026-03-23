@@ -63,7 +63,7 @@ def _pick_rating(pack_type: str, force_high: bool = False) -> tuple[int, int]:
     """Возвращает (min, max) диапазон рейтинга согласно весам пака."""
     cfg = PACK_WEIGHTS[pack_type]
     if force_high:
-        return (85, 99)
+        return (85, 88)
     ranges, weights = cfg["ranges"], cfg["weights"]
     chosen = random.choices(ranges, weights=weights, k=1)[0]
     return chosen
