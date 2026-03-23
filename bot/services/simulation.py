@@ -316,16 +316,19 @@ def events_to_dict(events: list[MatchEvent]) -> list[dict]:
         if e.event_type == "goal":
             item["scorer"] = {
                 "name": e.scorer_slot.player.name,
+                "club": e.scorer_slot.player.club or "",
                 "position": e.scorer_slot.slot_position,
                 "rating": e.scorer_slot.player.overall_rating,
             } if e.scorer_slot else None
             item["assist"] = {
                 "name": e.assist_slot.player.name,
+                "club": e.assist_slot.player.club or "",
                 "position": e.assist_slot.slot_position,
             } if e.assist_slot else None
         elif e.event_type in ("yellow_card", "red_card", "miss", "save"):
             item["player"] = {
                 "name": e.scorer_slot.player.name,
+                "club": e.scorer_slot.player.club or "",
                 "position": e.scorer_slot.slot_position,
             } if e.scorer_slot else None
         result.append(item)
