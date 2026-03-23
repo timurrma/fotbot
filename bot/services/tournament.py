@@ -226,9 +226,12 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
 
         # Если больше нет несыгранных матчей — помечаем турнир завершённым
         remaining = await get_next_unplayed_match(session, tournament)
-        if not remaining:
+        tournament_finished = not remaining
+        if tournament_finished:
             tournament.status = "finished"
             await session.commit()
+            # Строим итоги для анонса после матча
+            final_standings = await build_standings_text(session, tournament.id)
 
         home_name, away_name = _home_name, _away_name
 
@@ -261,6 +264,15 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             await asyncio.sleep(1)
             summary = format_match_summary(home_name, away_name, result, events_data)
             await bot.send_message(settings.group_id, summary)
+
+        # Итоги турнира если все матчи сыграны
+        if tournament_finished:
+            await asyncio.sleep(3)
+            await bot.send_message(
+                settings.group_id,
+                f"🏁 <b>Турнир недели завершён!</b>\n\n{final_standings}",
+                parse_mode="HTML",
+            )
 
         return True
 
