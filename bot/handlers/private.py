@@ -25,7 +25,7 @@ router = Router()
 
 # ─── /start ───────────────────────────────────────────────────────────────────
 
-@router.message(Command("start"), F.chat.type == "private")
+@router.message(Command("start"))
 async def cmd_start(message: Message) -> None:
     user_id = message.from_user.id
 
