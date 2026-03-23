@@ -193,7 +193,10 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         await asyncio.sleep(1)
 
         result = simulate_match(home_formation, home_cards, away_formation, away_cards)
-        events_data = events_to_dict(result.events)
+        # Маппинг card_id → owner для комментатора
+        card_owner = {card_id: _home_name for card_id, _ in home_cards}
+        card_owner.update({card_id: _away_name for card_id, _ in away_cards})
+        events_data = events_to_dict(result.events, card_owner)
 
         match.home_goals = result.home_goals
         match.away_goals = result.away_goals

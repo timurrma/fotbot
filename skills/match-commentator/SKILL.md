@@ -23,20 +23,20 @@ description: Комментирует один тайм симулированн
       "minute": 14,
       "type": "goal",
       "team": "home",
-      "scorer": {"name": "Mbappé", "position": "ST", "rating": 91},
-      "assist": {"name": "De Bruyne", "position": "CM"}
+      "scorer": {"name": "Mbappé", "owner": "timurRRMa", "position": "ST", "rating": 91},
+      "assist": {"name": "De Bruyne", "owner": "Djavaded", "position": "CM"}
     },
     {
       "minute": 33,
       "type": "yellow_card",
       "team": "away",
-      "player": {"name": "Cancelo", "position": "RB"}
+      "player": {"name": "Cancelo", "owner": "RRabb1dtt", "position": "RB"}
     },
     {
       "minute": 41,
       "type": "goal",
       "team": "away",
-      "scorer": {"name": "Salah", "position": "RW", "rating": 89},
+      "scorer": {"name": "Salah", "owner": "RRabb1dtt", "position": "RW", "rating": 89},
       "assist": null
     }
   ]
@@ -80,7 +80,7 @@ description: Комментирует один тайм симулированн
 
 **Длина сообщений**: 1-4 строки. Коротко, остро, эмоционально.
 
-**Имена**: транслитерируй если нужно (Mbappé → Мбаппе, De Bruyne → Де Брёйне). Рядом с именем игрока всегда пиши его клуб в скобках, если поле `club` не пустое. Пример: "Мбаппе (PSG)" или "Де Брёйне (Man City)".
+**Имена**: транслитерируй если нужно (Mbappé → Мбаппе, De Bruyne → Де Брёйне). ВСЕГДА рядом с именем ЛЮБОГО игрока (гол, ассист, карточка, промах) пиши никнейм владельца из поля `owner` в скобках, если оно не пустое. Это обязательно для каждого упоминания игрока. Пример: "Мбаппе (timurRRMa)" или "Де Брёйне (Djavaded)" или "Жёлтая у Боуэна (RRabb1dtt)".
 
 **Ассист**: если у гола есть `assist` — ОБЯЗАТЕЛЬНО упомяни ассистента в сообщении про гол. Формат: "Гол Мбаппе (acc. Де Брёйне)" или "Де Брёйне отдаёт на Мбаппе — и тот не промахивается!".
 

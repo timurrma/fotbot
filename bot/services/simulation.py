@@ -304,8 +304,9 @@ def simulate_match(
     )
 
 
-def events_to_dict(events: list[MatchEvent]) -> list[dict]:
+def events_to_dict(events: list[MatchEvent], card_owner: dict[int, str] | None = None) -> list[dict]:
     """Сериализует события для хранения в БД и передачи в LLM."""
+    card_owner = card_owner or {}
     result = []
     for e in events:
         item: dict = {
@@ -316,19 +317,19 @@ def events_to_dict(events: list[MatchEvent]) -> list[dict]:
         if e.event_type == "goal":
             item["scorer"] = {
                 "name": e.scorer_slot.player.name,
-                "club": e.scorer_slot.player.club or "",
+                "owner": card_owner.get(e.scorer_slot.user_card_id, ""),
                 "position": e.scorer_slot.slot_position,
                 "rating": e.scorer_slot.player.overall_rating,
             } if e.scorer_slot else None
             item["assist"] = {
                 "name": e.assist_slot.player.name,
-                "club": e.assist_slot.player.club or "",
+                "owner": card_owner.get(e.assist_slot.user_card_id, ""),
                 "position": e.assist_slot.slot_position,
             } if e.assist_slot else None
         elif e.event_type in ("yellow_card", "red_card", "miss", "save"):
             item["player"] = {
                 "name": e.scorer_slot.player.name,
-                "club": e.scorer_slot.player.club or "",
+                "owner": card_owner.get(e.scorer_slot.user_card_id, ""),
                 "position": e.scorer_slot.slot_position,
             } if e.scorer_slot else None
         result.append(item)
