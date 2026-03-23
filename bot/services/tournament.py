@@ -261,35 +261,25 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
 
         await session.flush()
 
-        # MVP матча — игрок с макс голами+ассистами
-        all_stats = {**result.home_stats, **result.away_stats}
-        mvp_card_id = max(all_stats, key=lambda cid: all_stats[cid]["goals"] + all_stats[cid]["assists"], default=None)
+        # MVP матча — взвешенный рандом: чем больше г+п тем выше шанс,
+        # но любой игрок (включая вратаря) теоретически может стать MVP
+        import random as _random
+        from sqlalchemy import and_
         mvp_text = None
-        if mvp_card_id and mvp_card_id != -1:
-            mvp_stat = all_stats[mvp_card_id]
-            if mvp_stat["goals"] + mvp_stat["assists"] > 0:
-                # Обновляем mvp_count в match_stats
-                from sqlalchemy import and_
-                mvp_row_result = await session.execute(
-                    select(MatchStat).where(
-                        and_(MatchStat.match_id == match.id, MatchStat.user_card_id == mvp_card_id)
-                    )
-                )
-                mvp_row = mvp_row_result.scalar_one_or_none()
-                if mvp_row:
-                    mvp_row.mvp_count = 1
-                    mvp_owner = wl_map.get(mvp_row.user_id, f"ID{mvp_row.user_id}")
-                    g = mvp_stat["goals"]
-                    a = mvp_stat["assists"]
-                    # Получаем имя игрока
-                    mvp_player_result = await session.execute(
-                        select(MatchStat).where(
-                            and_(MatchStat.match_id == match.id, MatchStat.user_card_id == mvp_card_id)
-                        )
-                    )
-                    mvp_player_name = mvp_row.player.name if mvp_row.player else "?"
-                    stat_str = f"⚽{g}" + (f" 🎯{a}" if a else "")
-                    mvp_text = f"🏅 <b>MVP матча:</b> {mvp_player_name} (@{mvp_owner}) — {stat_str}"
+        all_match_stats_result = await session.execute(
+            select(MatchStat).where(MatchStat.match_id == match.id)
+        )
+        all_match_stats = all_match_stats_result.scalars().all()
+        if all_match_stats:
+            # Вес = (г*3 + п*2 + 1) * random(0.5, 2.0)
+            weights = [(s.goals * 3 + s.assists * 2 + 1) * _random.uniform(0.5, 2.0) for s in all_match_stats]
+            mvp_row = _random.choices(all_match_stats, weights=weights, k=1)[0]
+            mvp_row.mvp_count = 1
+            mvp_owner = wl_map.get(mvp_row.user_id, f"ID{mvp_row.user_id}")
+            mvp_player_name = mvp_row.player.name if mvp_row.player else "?"
+            g, a = mvp_row.goals, mvp_row.assists
+            stat_str = (f"⚽{g}" if g else "") + (f" 🎯{a}" if a else "") or "без г+п"
+            mvp_text = f"🏅 <b>MVP матча:</b> {mvp_player_name} (@{mvp_owner}) — {stat_str}"
 
         await session.commit()
 
