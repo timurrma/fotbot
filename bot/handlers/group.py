@@ -93,16 +93,43 @@ async def cmd_schedule(message: Message) -> None:
 
 @router.message(Command("myteam"))
 async def cmd_myteam(message: Message) -> None:
-    """Показать текущий состав."""
+    """Показать состав — свой или по @username."""
+    # Определяем чей состав показывать
+    parts = message.text.split()
+    target_username = None
+    if len(parts) > 1 and parts[1].startswith("@"):
+        target_username = parts[1][1:].lower()
+
     user_id = message.from_user.id
+    display_name = "Твой состав"
+
+    if target_username:
+        # Ищем по упомянутому пользователю
+        if message.entities:
+            for entity in message.entities:
+                if entity.type == "mention" and entity.user:
+                    user_id = entity.user.id
+                    display_name = f"Состав @{target_username}"
+                    break
+        # Если mention без user (публичный юзернейм) — ищем в whitelist
+        if user_id == message.from_user.id:
+            from sqlalchemy import select
+            from bot.db.models import Whitelist
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(select(Whitelist))
+                for wl in result.scalars().all():
+                    if wl.username and wl.username.lower() == target_username:
+                        user_id = wl.user_id
+                        display_name = f"Состав @{target_username}"
+                        break
 
     async with AsyncSessionLocal() as session:
         squad = await session.get(UserSquad, user_id)
         if not squad or not squad.slot_assignments:
-            await message.reply("Состав не настроен. Настрой через кнопку Menu в личке с ботом.")
+            await message.reply("Состав не настроен.")
             return
 
-        lines = [f"🏟 Схема: {squad.formation}\n"]
+        lines = [f"🏟 {display_name} | Схема: {squad.formation}\n"]
         for slot, card_id in sorted(squad.slot_assignments.items()):
             card = await session.get(UserCard, card_id)
             if card:
