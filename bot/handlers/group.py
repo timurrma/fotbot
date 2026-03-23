@@ -10,7 +10,7 @@ from bot.services.stats import (
     get_top_assisters,
     get_top_scorers,
 )
-from bot.services.tournament import build_standings_text, get_or_create_tournament
+from bot.services.tournament import build_standings_text, get_or_create_tournament, get_active_tournament
 
 router = Router()
 
@@ -23,10 +23,47 @@ async def cmd_start_group(message: Message) -> None:
 
 @router.message(Command("standings"))
 async def cmd_standings(message: Message) -> None:
-    """Турнирная таблица текущей недели."""
+    """Турнирная таблица текущей недели + последние матчи + топ-3."""
+    from sqlalchemy import select as sa_select
+    from bot.db.models import Match
+
     async with AsyncSessionLocal() as session:
-        tournament = await get_or_create_tournament(session)
-        text = await build_standings_text(session, tournament.id)
+        tournament = await get_active_tournament(session)
+        if not tournament:
+            tournament = await get_or_create_tournament(session)
+
+        standings = await build_standings_text(session, tournament.id)
+
+        # Последние сыгранные матчи
+        result = await session.execute(
+            sa_select(Match).where(
+                Match.tournament_id == tournament.id,
+                Match.home_goals.isnot(None),
+            ).order_by(Match.played_at.desc()).limit(5)
+        )
+        played_matches = result.scalars().all()
+
+        # Топ-3 бомбардиры и ассистенты турнира
+        scorers = await get_top_scorers(session, limit=3, tournament_id=tournament.id)
+        assisters = await get_top_assisters(session, limit=3, tournament_id=tournament.id)
+
+    text = standings
+
+    if played_matches:
+        text += "\n\n📋 <b>Результаты матчей</b>\n"
+        for m in reversed(played_matches):
+            text += f"  ID{m.home_user_id} {m.home_goals}:{m.away_goals} ID{m.away_user_id}\n"
+
+    if scorers:
+        text += "\n⚽ <b>Бомбардиры</b>\n"
+        for i, r in enumerate(scorers, 1):
+            text += f"  {i}. {r['player_name']} — {r['goals']} гол.\n"
+
+    if assisters:
+        text += "\n🎯 <b>Ассистенты</b>\n"
+        for i, r in enumerate(assisters, 1):
+            text += f"  {i}. {r['player_name']} — {r['assists']} acc.\n"
+
     await message.reply(text, parse_mode="HTML")
 
 

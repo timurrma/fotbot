@@ -180,13 +180,29 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         if not home_cards or not away_cards:
             return False
 
+        # Получаем имена заранее для анонса
+        try:
+            home_chat = await bot.get_chat(match.home_user_id)
+            away_chat = await bot.get_chat(match.away_user_id)
+            _home_name = home_chat.username or home_chat.full_name or f"ID{match.home_user_id}"
+            _away_name = away_chat.username or away_chat.full_name or f"ID{match.away_user_id}"
+        except Exception:
+            _home_name = f"ID{match.home_user_id}"
+            _away_name = f"ID{match.away_user_id}"
+
+        await bot.send_message(
+            settings.group_id,
+            f"⚽ <b>Матч:</b> @{_home_name} vs @{_away_name}",
+        )
+        await asyncio.sleep(1)
+
         result = simulate_match(home_formation, home_cards, away_formation, away_cards)
         events_data = events_to_dict(result.events)
 
         match.home_goals = result.home_goals
         match.away_goals = result.away_goals
         match.events = events_data
-        match.played_at = datetime.now(timezone.utc)
+        match.played_at = datetime.utcnow()
 
         # Статистика
         for card_id, stat in result.home_stats.items():
@@ -218,15 +234,7 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             tournament.status = "finished"
             await session.commit()
 
-        # Юзернеймы
-        try:
-            home_chat = await bot.get_chat(match.home_user_id)
-            away_chat = await bot.get_chat(match.away_user_id)
-            home_name = home_chat.username or home_chat.full_name or f"ID{match.home_user_id}"
-            away_name = away_chat.username or away_chat.full_name or f"ID{match.away_user_id}"
-        except Exception:
-            home_name = f"ID{match.home_user_id}"
-            away_name = f"ID{match.away_user_id}"
+        home_name, away_name = _home_name, _away_name
 
         # Составы перед матчем
         lineup_text = _format_lineups(
@@ -302,7 +310,7 @@ async def auto_announce_results(bot: Bot) -> None:
             match.home_goals = sim_result.home_goals
             match.away_goals = sim_result.away_goals
             match.events = events_data
-            match.played_at = datetime.now(timezone.utc)
+            match.played_at = datetime.utcnow()
 
             for card_id, stat in sim_result.home_stats.items():
                 s = MatchStat(
@@ -346,6 +354,10 @@ async def auto_announce_results(bot: Bot) -> None:
 
 async def build_standings_text(session: AsyncSession, tournament_id: int | None = None) -> str:
     """Строит текст турнирной таблицы."""
+    # Собираем всех участников (whitelist) для базовой строки 0 очков
+    wl_result = await session.execute(select(Whitelist))
+    all_user_ids = [w.user_id for w in wl_result.scalars().all()]
+
     if tournament_id:
         result = await session.execute(
             select(Match).where(
@@ -359,7 +371,7 @@ async def build_standings_text(session: AsyncSession, tournament_id: int | None 
         )
 
     matches = result.scalars().all()
-    stats: dict[int, dict] = {}
+    stats: dict[int, dict] = {uid: {"w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0} for uid in all_user_ids}
 
     for m in matches:
         for uid, gf, ga in [
@@ -385,13 +397,15 @@ async def build_standings_text(session: AsyncSession, tournament_id: int | None 
         reverse=True,
     )
 
-    lines = ["📊 <b>Турнирная таблица</b>\n"]
+    title = "📊 <b>Турнирная таблица</b>\n" if tournament_id else "📊 <b>Таблица за всё время</b>\n"
+    lines = [title]
     medals = ["🥇", "🥈", "🥉"]
     for i, (uid, s) in enumerate(rows):
         pts = s["w"] * 3 + s["d"]
+        played = s["w"] + s["d"] + s["l"]
         medal = medals[i] if i < 3 else f"{i+1}."
         lines.append(
-            f"{medal} ID{uid}: {s['w']}В {s['d']}Н {s['l']}П | "
+            f"{medal} ID{uid}: {s['w']}В {s['d']}Н {s['l']}П ({played} игр) | "
             f"{s['gf']}:{s['ga']} | {pts} очк."
         )
 
