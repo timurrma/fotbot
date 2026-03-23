@@ -19,7 +19,7 @@ from aiohttp import web
 from sqlalchemy import select
 
 from bot.config import settings
-from bot.db.models import UserCard, UserSquad
+from bot.db.models import UserCard, UserSquad, PackHistory, Player
 from bot.db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -178,6 +178,47 @@ async def save_squad(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+async def get_last_pack(request: web.Request) -> web.Response:
+    """GET /api/lastpack?user_id=XXX — игроки из последнего открытого пака."""
+    user_id_str = request.rel_url.query.get("user_id")
+    if not user_id_str:
+        return web.json_response({"error": "user_id required"}, status=400)
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        return web.json_response({"error": "invalid user_id"}, status=400)
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(PackHistory)
+            .where(PackHistory.user_id == user_id)
+            .order_by(PackHistory.opened_at.desc())
+            .limit(1)
+        )
+        pack = result.scalar_one_or_none()
+
+    if not pack or not pack.player_ids:
+        return web.json_response([])
+
+    async with AsyncSessionLocal() as session:
+        players = []
+        for pid in pack.player_ids:
+            p = await session.get(Player, pid)
+            if p:
+                players.append({
+                    "id": p.id,
+                    "name": p.name,
+                    "club": p.club,
+                    "position": p.position,
+                    "rating": p.overall_rating,
+                    "photo": p.photo_url,
+                    "pack_type": pack.pack_type,
+                    "opened_at": pack.opened_at.isoformat(),
+                })
+
+    return web.json_response(players)
+
+
 # ─── App factory ──────────────────────────────────────────────────────────────
 
 def create_api_app() -> web.Application:
@@ -204,6 +245,7 @@ def create_api_app() -> web.Application:
     app.router.add_post("/api/squad", save_squad)
     app.router.add_options("/api/squad", lambda r: web.Response())
     app.router.add_get("/api/photo", proxy_photo)
+    app.router.add_get("/api/lastpack", get_last_pack)
 
     # Раздаём Mini App (index.html) по корневому пути
     import os

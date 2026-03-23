@@ -403,6 +403,10 @@
 <!-- Hint -->
 <div class="hint" id="hint">Выбери слот на поле, затем выбери игрока из списка</div>
 
+<!-- Last pack -->
+<div class="section-title" id="lastPackTitle" style="display:none">Последний пак</div>
+<div class="player-list" id="lastPackList"></div>
+
 <!-- Player list -->
 <div class="section-title">Коллекция</div>
 <div class="filter-row" id="filterRow"></div>
@@ -517,7 +521,7 @@ async function init() {
   }
 
   renderFormationTabs();
-  await Promise.all([loadCards(), loadSquad()]);
+  await Promise.all([loadCards(), loadSquad(), loadLastPack()]);
   renderPitch();
   renderPlayerList();
   renderFilterRow();
@@ -539,6 +543,44 @@ async function loadCards() {
     cards.sort((a, b) => b.rating - a.rating);
   } catch(e) {
     showToast('❌ Ошибка загрузки карточек');
+  }
+}
+
+async function loadLastPack() {
+  try {
+    const r = await fetch(`${API_BASE}/api/lastpack?user_id=${userId}`, { cache: 'no-store' });
+    const players = await r.json();
+    if (!Array.isArray(players) || players.length === 0) return;
+    document.getElementById('lastPackTitle').style.display = '';
+    const list = document.getElementById('lastPackList');
+    list.innerHTML = '';
+    const packType = players[0].pack_type;
+    const typeLabel = packType === 'starter' ? '🌟 Стартовый' : packType === 'special' ? '💎 Специальный' : '🎴 Еженедельный';
+    const date = new Date(players[0].opened_at).toLocaleDateString('ru', {day:'numeric', month:'short'});
+    const meta = document.createElement('div');
+    meta.style.cssText = 'font-size:12px;color:#94a3b8;padding:0 16px 8px;';
+    meta.textContent = `${typeLabel} · ${date}`;
+    list.appendChild(meta);
+    for (const p of players) {
+      const el = document.createElement('div');
+      el.className = 'player-card';
+      const ratingClass = p.rating >= 90 ? 'gold' : p.rating >= 85 ? 'silver' : '';
+      const star = p.rating >= 90 ? '👑' : p.rating >= 85 ? '🌟' : '⭐';
+      el.innerHTML = `
+        <div class="player-avatar">
+          ${p.photo
+            ? `<img src="${API_BASE}/api/photo?url=${encodeURIComponent(p.photo)}" onerror="this.style.display='none'" loading="lazy">`
+            : `<span style="font-size:20px">👤</span>`}
+        </div>
+        <div class="player-info">
+          <div class="player-name">${p.name}</div>
+          <div class="player-meta">${p.position} · ${p.club || '—'}</div>
+        </div>
+        <div class="player-rating ${ratingClass}">${p.rating} ${star}</div>`;
+      list.appendChild(el);
+    }
+  } catch(e) {
+    // Тихо — пак не критичен
   }
 }
 
@@ -710,11 +752,17 @@ function selectSlot(slotName) {
     delete squad[slotName];
     selectedSlot = null;
     setHint(false);
+    posFilter = 'ALL';
   } else {
     selectedSlot = slotName;
     setHint(true);
+    // Автофильтр по позиции слота
+    const slotPos = SLOT_POSITION[slotName];
+    posFilter = slotPos || 'ALL';
   }
+  visibleCount = pageSize;
   renderPitch();
+  renderFilterRow();
   renderPlayerList();
 }
 
