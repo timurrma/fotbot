@@ -54,7 +54,7 @@ FORMATIONS_SLOTS: dict[str, list[str]] = {
     "4-3-3": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CDM", "LW", "RW", "ST"],
     "3-5-2": ["GK", "CB", "CB", "CB", "CM", "CM", "CDM", "LM", "RM", "ST", "ST"],
     "5-3-2": ["GK", "CB", "CB", "CB", "LB", "RB", "CM", "CM", "CDM", "ST", "ST"],
-    "4-2-3-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "LW", "RW", "ST"],
+    "4-2-3-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "LM", "RM", "ST"],
     "4-1-4-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "LM", "RM", "ST"],
     "4-5-1": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "LM", "RM", "ST"],
     "3-4-3": ["GK", "CB", "CB", "CB", "LM", "CM", "CM", "RM", "LW", "ST", "RW"],
