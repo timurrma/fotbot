@@ -164,11 +164,18 @@ def poisson_goals(lam: float) -> int:
 
 
 def _pick_by_prob(slots: list[PlayerSlot], prob_table: dict[str, int]) -> Optional[PlayerSlot]:
-    """Выбирает слот по вероятностям позиции."""
-    weights = [prob_table.get(s.slot_position, 1) for s in slots]
-    total = sum(weights)
-    if total == 0:
-        return random.choice(slots) if slots else None
+    """Выбирает слот по вероятностям позиции × рейтинг игрока.
+
+    Итоговый вес = позиционная вероятность * (effective_rating / 75).
+    Так Холанд (90) с весом позиции 35 получит ~2× больше шансов чем
+    защитник (65) с весом позиции 4, даже если у них одинаковый вес позиции.
+    """
+    if not slots:
+        return None
+    weights = [
+        prob_table.get(s.slot_position, 1) * (s.effective_rating / 75.0)
+        for s in slots
+    ]
     return random.choices(slots, weights=weights, k=1)[0]
 
 
