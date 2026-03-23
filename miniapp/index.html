@@ -150,7 +150,7 @@
     align-items: center;
     justify-content: center;
     font-size: 18px;
-    overflow: hidden;
+    overflow: visible;
     transition: all 0.2s;
     position: relative;
   }
@@ -174,8 +174,9 @@
   }
   .slot-rating {
     position: absolute;
-    bottom: -2px;
-    right: -2px;
+    bottom: 0px;
+    right: 0px;
+    z-index: 10;
     background: var(--card-bg);
     border-radius: 6px;
     font-size: 9px;
@@ -567,7 +568,7 @@ function selectFormation(f) {
 // ─── Pitch ────────────────────────────────────────────────────────────────────
 function renderPitch() {
   const pitch = document.getElementById('pitch');
-  const rows = FORMATIONS[formation] || [];
+  const rows = [...(FORMATIONS[formation] || [])].reverse(); // вратарь снизу
   pitch.innerHTML = '';
 
   for (const row of rows) {
@@ -591,15 +592,22 @@ function makeSlotEl(slotName) {
   const avatar = document.createElement('div');
   avatar.className = 'slot-avatar';
 
+  // Внутренний круг для фото (с clip)
+  const photoWrap = document.createElement('div');
+  photoWrap.style.cssText = 'width:100%;height:100%;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;';
+
   if (card) {
     if (card.photo) {
       const img = document.createElement('img');
-      img.src = card.photo;
-      img.onerror = () => { img.replaceWith(document.createTextNode('👤')); };
-      avatar.appendChild(img);
+      img.src = photoUrl(card.photo);
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+      img.onerror = () => { photoWrap.textContent = '👤'; };
+      photoWrap.appendChild(img);
     } else {
-      avatar.textContent = '👤';
+      photoWrap.textContent = '👤';
     }
+    avatar.appendChild(photoWrap);
+    // Рейтинг поверх, z-index выше
     const ratingEl = document.createElement('div');
     ratingEl.className = 'slot-rating';
     ratingEl.textContent = card.rating;
@@ -608,7 +616,8 @@ function makeSlotEl(slotName) {
     const icon = document.createElement('span');
     icon.className = 'slot-icon';
     icon.textContent = slotName === 'GK' ? '🧤' : '+';
-    avatar.appendChild(icon);
+    photoWrap.appendChild(icon);
+    avatar.appendChild(photoWrap);
   }
 
   const label = document.createElement('div');
@@ -623,6 +632,11 @@ function makeSlotEl(slotName) {
   el.appendChild(label);
   el.appendChild(nameEl);
   return el;
+}
+
+function photoUrl(url) {
+  if (!url) return null;
+  return `${API_BASE}/api/photo?url=${encodeURIComponent(url)}`;
 }
 
 function shortName(name) {

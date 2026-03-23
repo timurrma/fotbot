@@ -55,6 +55,26 @@ def verify_telegram_init_data(init_data: str) -> Optional[dict]:
     return params
 
 
+# ─── Photo proxy ──────────────────────────────────────────────────────────────
+
+async def proxy_photo(request: web.Request) -> web.Response:
+    """GET /api/photo?url=... — проксирует фото с sofifa CDN."""
+    import aiohttp as aio
+    url = request.rel_url.query.get("url", "")
+    if not url.startswith("https://cdn.sofifa.net/"):
+        return web.Response(status=400)
+    try:
+        async with aio.ClientSession() as session:
+            async with session.get(url, headers={"Referer": "https://sofifa.com/"}, timeout=aio.ClientTimeout(total=5)) as resp:
+                if resp.status != 200:
+                    return web.Response(status=404)
+                data = await resp.read()
+                return web.Response(body=data, content_type="image/png",
+                                    headers={"Cache-Control": "public, max-age=86400"})
+    except Exception:
+        return web.Response(status=502)
+
+
 # ─── Handlers ─────────────────────────────────────────────────────────────────
 
 async def get_cards(request: web.Request) -> web.Response:
@@ -183,6 +203,7 @@ def create_api_app() -> web.Application:
     app.router.add_get("/api/squad", get_squad)
     app.router.add_post("/api/squad", save_squad)
     app.router.add_options("/api/squad", lambda r: web.Response())
+    app.router.add_get("/api/photo", proxy_photo)
 
     # Раздаём Mini App (index.html) по корневому пути
     import os
