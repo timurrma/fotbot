@@ -7,8 +7,8 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <!-- Set window.API_BASE before this file to override, or use ?api= query param -->
 <script>
-  // Default API base — override in config.js or via query param
-  window.API_BASE_DEFAULT = 'https://your-bot-api.railway.app';
+  // Если Mini App открыта с того же домена что и API — используем текущий origin
+  window.API_BASE_DEFAULT = window.location.origin;
 </script>
 <style>
   :root {

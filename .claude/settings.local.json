@@ -20,7 +20,11 @@
       "Bash(git rm:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(python3 -m pip install asyncpg==0.30.0 -q)"
+      "Bash(python3 -m pip install asyncpg==0.30.0 -q)",
+      "Bash(git filter-branch:*)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --env-filter ':*)",
+      "Bash(git stash:*)",
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git ls-files -s .env.example | while read mode hash stage file; do:*)"
     ]
   }
 }

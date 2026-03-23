@@ -4,3 +4,6 @@ builder = "nixpacks"
 [deploy]
 startCommand = "python3 -m bot.main"
 restartPolicyType = "always"
+
+[[services]]
+port = 8080

@@ -184,6 +184,16 @@ def create_api_app() -> web.Application:
     app.router.add_post("/api/squad", save_squad)
     app.router.add_options("/api/squad", lambda r: web.Response())
 
+    # Раздаём Mini App (index.html) по корневому пути
+    import os
+    miniapp_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "miniapp", "index.html")
+
+    async def serve_miniapp(request: web.Request) -> web.Response:
+        return web.FileResponse(miniapp_path)
+
+    app.router.add_get("/", serve_miniapp)
+    app.router.add_get("/miniapp", serve_miniapp)
+
     return app
 
 
