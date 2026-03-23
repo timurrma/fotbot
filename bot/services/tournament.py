@@ -356,7 +356,9 @@ async def build_standings_text(session: AsyncSession, tournament_id: int | None 
     """Строит текст турнирной таблицы."""
     # Собираем всех участников (whitelist) для базовой строки 0 очков
     wl_result = await session.execute(select(Whitelist))
-    all_user_ids = [w.user_id for w in wl_result.scalars().all()]
+    wl_rows = wl_result.scalars().all()
+    all_user_ids = [w.user_id for w in wl_rows]
+    usernames = {w.user_id: (w.username or f"ID{w.user_id}") for w in wl_rows}
 
     if tournament_id:
         result = await session.execute(
@@ -404,8 +406,9 @@ async def build_standings_text(session: AsyncSession, tournament_id: int | None 
         pts = s["w"] * 3 + s["d"]
         played = s["w"] + s["d"] + s["l"]
         medal = medals[i] if i < 3 else f"{i+1}."
+        name = usernames.get(uid, f"ID{uid}")
         lines.append(
-            f"{medal} ID{uid}: {s['w']}В {s['d']}Н {s['l']}П ({played} игр) | "
+            f"{medal} @{name}: {s['w']}В {s['d']}Н {s['l']}П ({played} игр) | "
             f"{s['gf']}:{s['ga']} | {pts} очк."
         )
 

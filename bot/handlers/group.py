@@ -43,6 +43,12 @@ async def cmd_standings(message: Message) -> None:
         )
         played_matches = result.scalars().all()
 
+        # Никнеймы из whitelist
+        from bot.db.models import Whitelist
+        from sqlalchemy import select as wl_select
+        wl_result = await session.execute(wl_select(Whitelist))
+        wl_map = {w.user_id: (w.username or f"ID{w.user_id}") for w in wl_result.scalars().all()}
+
         # Топ-3 бомбардиры и ассистенты турнира
         scorers = await get_top_scorers(session, limit=3, tournament_id=tournament.id)
         assisters = await get_top_assisters(session, limit=3, tournament_id=tournament.id)
@@ -52,7 +58,9 @@ async def cmd_standings(message: Message) -> None:
     if played_matches:
         text += "\n\n📋 <b>Результаты матчей</b>\n"
         for m in reversed(played_matches):
-            text += f"  ID{m.home_user_id} {m.home_goals}:{m.away_goals} ID{m.away_user_id}\n"
+            h = wl_map.get(m.home_user_id, f"ID{m.home_user_id}")
+            a = wl_map.get(m.away_user_id, f"ID{m.away_user_id}")
+            text += f"  @{h} {m.home_goals}:{m.away_goals} @{a}\n"
 
     if scorers:
         text += "\n⚽ <b>Бомбардиры</b>\n"
