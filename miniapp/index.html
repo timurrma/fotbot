@@ -443,6 +443,7 @@
 
 <div class="header">
   <h1 id="pageTitle">⚽ Состав</h1>
+  <span id="avgRating" style="font-size:13px;color:var(--gold);font-weight:700;margin-right:4px"></span>
   <button class="save-btn" style="background:transparent;color:var(--text-muted);font-size:20px;padding:4px 10px;" onclick="reloadAll()" title="Обновить">🔄</button>
   <button class="save-btn" id="saveBtn" onclick="saveSquad()">Сохранить</button>
 </div>
@@ -742,6 +743,23 @@ function renderPitch() {
     }
     pitch.appendChild(rowEl);
   }
+  updateAvgRating();
+}
+
+function updateAvgRating() {
+  const allSlots = FORMATIONS[formation].flat();
+  const ratings = allSlots
+    .map(slot => {
+      const cardId = squad[slot];
+      const card = cardId ? cards.find(c => c.id === cardId) : null;
+      if (!card) return null;
+      return card.rating + computePenalty(card, slot);
+    })
+    .filter(r => r !== null);
+  const el = document.getElementById('avgRating');
+  if (ratings.length === 0) { el.textContent = ''; return; }
+  const avg = (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1);
+  el.textContent = `★ ${avg}`;
 }
 
 function makeSlotEl(slotName) {
@@ -1113,6 +1131,11 @@ function renderOpponentPitch(data) {
   }
   html += '</div>';
   document.getElementById('opponentPitch').innerHTML = html;
+
+  // Средний рейтинг соперника
+  const oppRatings = (data.slots || []).filter(s => mainSlots.includes(s.slot)).map(s => s.player.rating ?? s.player.overall_rating);
+  const oppAvg = oppRatings.length ? (oppRatings.reduce((a,b)=>a+b,0)/oppRatings.length).toFixed(1) : null;
+  document.getElementById('avgRating').textContent = oppAvg ? `★ ${oppAvg}` : '';
 }
 
 // ─── Transfer market ──────────────────────────────────────────────────────────
