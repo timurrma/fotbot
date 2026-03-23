@@ -487,7 +487,9 @@ async def build_standings_text(session: AsyncSession, tournament_id: int | None 
             (m.home_user_id, m.home_goals, m.away_goals),
             (m.away_user_id, m.away_goals, m.home_goals),
         ]:
-            s = stats.setdefault(uid, {"w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0})
+            if uid not in stats:
+                continue
+            s = stats[uid]
             s["gf"] += gf
             s["ga"] += ga
             if gf > ga:
