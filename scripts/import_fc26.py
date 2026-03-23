@@ -25,14 +25,14 @@ CSV_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "FC26_202509
 
 MIN_RATING = 65
 
-# Лиги без ограничений по клубам
-TARGET_LEAGUES = {
-    "Premier League",   # АПЛ 1
-    "Championship",     # АПЛ 2
-    "La Liga",          # Ла Лига
-    "Serie A",          # Серия А
-    "Bundesliga",       # Бундеслига
-    "Ligue 1",          # Лига 1
+# Лиги без ограничений по клубам (фильтр по league_id — уникален в датасете)
+TARGET_LEAGUE_IDS = {
+    13,    # Premier League (England)
+    14,    # Championship (England)
+    53,    # La Liga (Spain)
+    31,    # Serie A (Italy)
+    19,    # Bundesliga (Germany)
+    16,    # Ligue 1 (France)
 }
 
 # Лиги с фильтром только по определённым клубам
@@ -118,7 +118,8 @@ async def import_csv(session: AsyncSession) -> dict[str, int]:
 
             # Определяем попадает ли игрок в выборку
             club_name = row["club_name"]
-            in_top_league = league_name in TARGET_LEAGUES
+            league_id_int = int(row["league_id"]) if row["league_id"] else 0
+            in_top_league = league_id_int in TARGET_LEAGUE_IDS
             in_filtered = (
                 league_name in FILTERED_LEAGUES or is_saudi(league_name)
             ) and club_name in TARGET_CLUBS
