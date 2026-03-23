@@ -122,6 +122,76 @@ async def commentate_half(
     return lines[:6]
 
 
+async def rate_players(
+    client: "AsyncOpenAI",
+    model: str,
+    home_username: str,
+    away_username: str,
+    result: MatchResult,
+    events_data: list[dict],
+) -> dict[int, float]:
+    """
+    Просит LLM выставить оценку каждому игроку матча (1.0–3.0).
+    Возвращает {user_card_id: score}.
+    """
+    # Собираем список игроков из lineups
+    players_list = []
+    for slot in result.events:
+        pass  # events не содержат card_id напрямую
+
+    # Собираем из home_stats и away_stats
+    all_stats = {**result.home_stats, **result.away_stats}
+    if not all_stats:
+        return {}
+
+    players_info = []
+    for card_id, stat in all_stats.items():
+        if card_id == -1:
+            continue
+        players_info.append({
+            "card_id": card_id,
+            "player_id": stat["player_id"],
+            "goals": stat["goals"],
+            "assists": stat["assists"],
+        })
+
+    # Добавляем события для контекста
+    payload = {
+        "home_team": home_username,
+        "away_team": away_username,
+        "score": f"{result.home_goals}:{result.away_goals}",
+        "players": players_info,
+        "events": [e for e in events_data if e.get("type") in ("goal", "save", "miss", "yellow_card", "red_card")],
+    }
+
+    prompt = (
+        "Ты оцениваешь игроков футбольного матча. "
+        "На основе событий матча выставь каждому игроку оценку от 1.0 до 3.0 "
+        "где 1.0 = обычный матч, 2.0 = хорошая игра, 3.0 = выдающийся матч. "
+        "Учитывай голы, ассисты, сейвы, карточки и общее влияние на игру. "
+        "Верни ТОЛЬКО JSON объект вида {\"card_id\": score, ...} без пояснений.\n\n"
+        f"```json\n{json.dumps(payload, ensure_ascii=False)}\n```"
+    )
+
+    try:
+        response = await client.chat.completions.create(
+            model=model,
+            max_completion_tokens=500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        import re as _re
+        raw = response.choices[0].message.content.strip()
+        raw = _re.sub(r"<think>.*?</think>", "", raw, flags=_re.DOTALL).strip()
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start != -1 and end > start:
+            parsed = json.loads(raw[start:end])
+            return {int(k): float(v) for k, v in parsed.items()}
+    except Exception:
+        pass
+    return {}
+
+
 async def commentate_match(
     home_username: str,
     away_username: str,
@@ -129,10 +199,10 @@ async def commentate_match(
     away_formation: str,
     result: MatchResult,
     events_data: list[dict],
-) -> list[str]:
+) -> tuple[list[str], dict[int, float]]:
     """
     Генерирует полный комментарий матча: анонс + 1 тайм + перерыв + 2 тайм + итог.
-    Возвращает список строк — каждая строка отдельное Telegram-сообщение.
+    Возвращает (список сообщений, {card_id: llm_score}).
     """
     client, model = _make_client()
     skill_prompt = _load_skill_prompt()
@@ -227,7 +297,10 @@ async def commentate_match(
         f"{winner_line}"
     )
 
-    return messages
+    # Оценки игроков от LLM (параллельно не делаем — уже потратили токены)
+    llm_scores = await rate_players(client, model, home_username, away_username, result, events_data)
+
+    return messages, llm_scores
 
 
 def format_match_summary(

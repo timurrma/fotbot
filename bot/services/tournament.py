@@ -261,18 +261,23 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
 
         await session.flush()
 
-        # MVP матча — взвешенный рандом: чем больше г+п тем выше шанс,
-        # но любой игрок (включая вратаря) теоретически может стать MVP
+        # MVP матча — взвешенный рандом с учётом г+п и оценки LLM
+        # Вес = (г*3 + п*2 + 1) * random(0.5, 2.0) * llm_factor
+        # llm_factor = llm_score (1.0–3.0), если LLM не оценил — 1.5 (нейтрально)
         import random as _random
-        from sqlalchemy import and_
         mvp_text = None
         all_match_stats_result = await session.execute(
             select(MatchStat).where(MatchStat.match_id == match.id)
         )
         all_match_stats = all_match_stats_result.scalars().all()
         if all_match_stats:
-            # Вес = (г*3 + п*2 + 1) * random(0.5, 2.0)
-            weights = [(s.goals * 3 + s.assists * 2 + 1) * _random.uniform(0.5, 2.0) for s in all_match_stats]
+            def _mvp_weight(s: MatchStat) -> float:
+                base = (s.goals * 3 + s.assists * 2 + 1) * _random.uniform(0.5, 2.0)
+                llm_factor = llm_scores.get(s.user_card_id, 1.5)  # 1.5 = нейтрально
+                llm_factor = max(1.0, min(3.0, llm_factor))  # зажимаем 1.0–3.0
+                return base * llm_factor
+
+            weights = [_mvp_weight(s) for s in all_match_stats]
             mvp_row = _random.choices(all_match_stats, weights=weights, k=1)[0]
             mvp_row.mvp_count = 1
             mvp_owner = wl_map.get(mvp_row.user_id, f"ID{mvp_row.user_id}")
@@ -300,9 +305,10 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             away_name, away_formation, away_cards,
         )
 
+        llm_scores: dict = {}
         if with_commentary:
             try:
-                messages = await commentate_match(
+                messages, llm_scores = await commentate_match(
                     home_name, away_name,
                     home_formation, away_formation,
                     result, events_data,
