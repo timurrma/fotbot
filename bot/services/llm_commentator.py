@@ -73,13 +73,13 @@ async def commentate_half(
     """Генерирует 5-6 сообщений для одного тайма."""
     user_message = (
         f"Прокомментируй {'первый' if payload['half'] == 1 else 'второй'} тайм матча. "
-        f"Сделай 5-6 коротких живых сообщений.\n\n"
+        f"Сделай ровно 10-12 коротких живых сообщений.\n\n"
         f"```json\n{json.dumps(payload, ensure_ascii=False, indent=2)}\n```"
     )
 
     response = await client.chat.completions.create(
         model=model,
-        max_completion_tokens=1500,
+        max_completion_tokens=3000,
         messages=[
             {"role": "system", "content": skill_prompt},
             {"role": "user", "content": user_message},
@@ -119,7 +119,7 @@ async def commentate_half(
     lines = [msg.strip() for msg in raw.split("\n\n") if msg.strip()]
     if not lines:
         lines = [msg.strip() for msg in raw.split("\n") if msg.strip()]
-    return lines[:6]
+    return lines[:12]
 
 
 async def rate_players(

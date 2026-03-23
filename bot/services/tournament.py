@@ -317,11 +317,19 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
                 messages = [format_match_summary(home_name, away_name, result, events_data)]
 
             # Вставляем составы первым сообщением
-            all_messages = [lineup_text] + messages
-            for msg in all_messages:
+            # Составы — отдельно, потом LLM-сообщения попарно (2 в одном)
+            try:
+                await bot.send_message(settings.group_id, lineup_text, parse_mode="HTML")
+                await asyncio.sleep(8)
+            except Exception:
+                pass
+            # Объединяем LLM-сообщения по 2
+            for i in range(0, len(messages), 2):
+                pair = messages[i:i + 2]
+                combined = "\n\n".join(pair)
                 try:
-                    await bot.send_message(settings.group_id, msg)
-                    await asyncio.sleep(4)
+                    await bot.send_message(settings.group_id, combined)
+                    await asyncio.sleep(8)
                 except Exception:
                     pass
         else:
