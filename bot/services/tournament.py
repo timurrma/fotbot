@@ -180,15 +180,11 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         if not home_cards or not away_cards:
             return False
 
-        # Получаем имена заранее для анонса
-        try:
-            home_chat = await bot.get_chat(match.home_user_id)
-            away_chat = await bot.get_chat(match.away_user_id)
-            _home_name = home_chat.username or home_chat.full_name or f"ID{match.home_user_id}"
-            _away_name = away_chat.username or away_chat.full_name or f"ID{match.away_user_id}"
-        except Exception:
-            _home_name = f"ID{match.home_user_id}"
-            _away_name = f"ID{match.away_user_id}"
+        # Получаем имена из whitelist
+        home_wl = await session.get(Whitelist, match.home_user_id)
+        away_wl = await session.get(Whitelist, match.away_user_id)
+        _home_name = (home_wl.username if home_wl and home_wl.username else None) or f"ID{match.home_user_id}"
+        _away_name = (away_wl.username if away_wl and away_wl.username else None) or f"ID{match.away_user_id}"
 
         await bot.send_message(
             settings.group_id,
@@ -335,13 +331,10 @@ async def auto_announce_results(bot: Bot) -> None:
 
             await session.commit()
 
-            try:
-                home_chat = await bot.get_chat(match.home_user_id)
-                away_chat = await bot.get_chat(match.away_user_id)
-                home_name = home_chat.username or home_chat.full_name or f"ID{match.home_user_id}"
-                away_name = away_chat.username or away_chat.full_name or f"ID{match.away_user_id}"
-            except Exception:
-                home_name, away_name = f"ID{match.home_user_id}", f"ID{match.away_user_id}"
+            home_wl = await session.get(Whitelist, match.home_user_id)
+            away_wl = await session.get(Whitelist, match.away_user_id)
+            home_name = (home_wl.username if home_wl and home_wl.username else None) or f"ID{match.home_user_id}"
+            away_name = (away_wl.username if away_wl and away_wl.username else None) or f"ID{match.away_user_id}"
 
             summary = format_match_summary(home_name, away_name, sim_result, events_data)
             await bot.send_message(settings.group_id, summary)
