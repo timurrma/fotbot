@@ -64,7 +64,7 @@ async def commentate_half(
     )
 
     response = await client.chat.completions.create(
-        model="gpt-5.4-nano",
+        model="gpt-5.4-mini",
         max_completion_tokens=1500,
         messages=[
             {"role": "system", "content": skill_prompt},
