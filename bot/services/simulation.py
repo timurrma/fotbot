@@ -184,7 +184,7 @@ def _pick_by_prob(slots: list[PlayerSlot], prob_table: dict[str, int]) -> Option
     if not slots:
         return None
     weights = [
-        prob_table.get(s.slot_position, 1) * (s.effective_rating / 75.0)
+        prob_table.get(s.slot_position, 1) * (s.effective_rating / 75.0) ** 2
         for s in slots
     ]
     return random.choices(slots, weights=weights, k=1)[0]
