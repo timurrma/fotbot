@@ -20,7 +20,7 @@ async def get_top_scorers(
             Player.name,
             func.sum(MatchStat.goals).label("total_goals"),
             func.sum(MatchStat.assists).label("total_assists"),
-            func.count(MatchStat.match_id.distinct()).label("appearances"),
+            func.sum(MatchStat.appearances).label("appearances"),
         )
         .join(Player, MatchStat.player_id == Player.id)
         .group_by(MatchStat.user_id, MatchStat.player_id, Player.name)
@@ -58,7 +58,7 @@ async def get_top_assisters(
             Player.name,
             func.sum(MatchStat.goals).label("total_goals"),
             func.sum(MatchStat.assists).label("total_assists"),
-            func.count(MatchStat.match_id.distinct()).label("appearances"),
+            func.sum(MatchStat.appearances).label("appearances"),
         )
         .join(Player, MatchStat.player_id == Player.id)
         .group_by(MatchStat.user_id, MatchStat.player_id, Player.name)
@@ -95,7 +95,7 @@ async def get_user_stats(
             Player.name,
             func.sum(MatchStat.goals).label("total_goals"),
             func.sum(MatchStat.assists).label("total_assists"),
-            func.count(MatchStat.match_id.distinct()).label("appearances"),
+            func.sum(MatchStat.appearances).label("appearances"),
         )
         .join(Player, MatchStat.player_id == Player.id)
         .where(MatchStat.user_id == user_id)

@@ -232,27 +232,26 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         match.events = events_data
         match.played_at = datetime.utcnow()
 
-        # Статистика
-        for card_id, stat in result.home_stats.items():
-            s = MatchStat(
-                match_id=match.id,
-                user_id=match.home_user_id,
-                user_card_id=card_id,
-                player_id=stat["player_id"],
-                goals=stat["goals"],
-                assists=stat["assists"],
-            )
-            session.add(s)
-        for card_id, stat in result.away_stats.items():
-            s = MatchStat(
-                match_id=match.id,
-                user_id=match.away_user_id,
-                user_card_id=card_id,
-                player_id=stat["player_id"],
-                goals=stat["goals"],
-                assists=stat["assists"],
-            )
-            session.add(s)
+        # Статистика — все игроки основы получают appearances=1
+        def _save_stats(user_id, cards, stats):
+            stats_by_card = {cid: stat for cid, stat in [(cid, s) for cid, s in stats.items()]}
+            for card_id, player in cards:
+                if card_id == -1:  # фантомный игрок
+                    continue
+                stat = stats_by_card.get(card_id, {"player_id": player.id, "goals": 0, "assists": 0})
+                s = MatchStat(
+                    match_id=match.id,
+                    user_id=user_id,
+                    user_card_id=card_id,
+                    player_id=stat["player_id"],
+                    goals=stat["goals"],
+                    assists=stat["assists"],
+                    appearances=1,
+                )
+                session.add(s)
+
+        _save_stats(match.home_user_id, home_cards, result.home_stats)
+        _save_stats(match.away_user_id, away_cards, result.away_stats)
 
         await session.commit()
 
@@ -352,26 +351,24 @@ async def auto_announce_results(bot: Bot) -> None:
             match.events = events_data
             match.played_at = datetime.utcnow()
 
-            for card_id, stat in sim_result.home_stats.items():
-                s = MatchStat(
-                    match_id=match.id,
-                    user_id=match.home_user_id,
-                    user_card_id=card_id,
-                    player_id=stat["player_id"],
-                    goals=stat["goals"],
-                    assists=stat["assists"],
-                )
-                session.add(s)
-            for card_id, stat in sim_result.away_stats.items():
-                s = MatchStat(
-                    match_id=match.id,
-                    user_id=match.away_user_id,
-                    user_card_id=card_id,
-                    player_id=stat["player_id"],
-                    goals=stat["goals"],
-                    assists=stat["assists"],
-                )
-                session.add(s)
+            def _save_auto_stats(user_id, cards, stats):
+                for card_id, player in cards:
+                    if card_id == -1:
+                        continue
+                    stat = stats.get(card_id, {"player_id": player.id, "goals": 0, "assists": 0})
+                    s = MatchStat(
+                        match_id=match.id,
+                        user_id=user_id,
+                        user_card_id=card_id,
+                        player_id=stat["player_id"],
+                        goals=stat["goals"],
+                        assists=stat["assists"],
+                        appearances=1,
+                    )
+                    session.add(s)
+
+            _save_auto_stats(match.home_user_id, home_cards, sim_result.home_stats)
+            _save_auto_stats(match.away_user_id, away_cards, sim_result.away_stats)
 
             await session.commit()
 
