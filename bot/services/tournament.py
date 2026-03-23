@@ -38,7 +38,6 @@ async def _get_squad_cards(
     if squad_row and squad_row.slot_assignments:
         formation = squad_row.formation
         assignments = squad_row.slot_assignments
-        # Маппинг имён слотов miniapp → позиция схемы
         SLOT_TO_POS = {
             "GK": "GK",
             "CB1": "CB", "CB2": "CB", "CB3": "CB",
@@ -50,11 +49,12 @@ async def _get_squad_cards(
             "LW": "LW", "RW": "RW",
             "ST": "ST", "ST1": "ST", "ST2": "ST",
         }
-        # Порядок слотов по схеме (чтобы GK всегда первым)
         SLOT_ORDER = ["GK", "CB1", "CB2", "CB3", "LB", "RB",
                       "CDM1", "CDM2", "CM", "CM1", "CM2", "CM3",
                       "LM", "RM", "CAM", "LW", "RW", "ST", "ST1", "ST2"]
         ordered_slots = sorted(assignments.keys(), key=lambda s: SLOT_ORDER.index(s) if s in SLOT_ORDER else 99)
+        from sqlalchemy.orm import joinedload
+        from bot.db.models import Player as PlayerModel
         cards = []
         for slot_name in ordered_slots:
             card_id = assignments[slot_name]
@@ -62,11 +62,27 @@ async def _get_squad_cards(
             if card:
                 slot_pos = SLOT_TO_POS.get(slot_name, "CM")
                 cards.append((card_id, card.player, slot_pos))
-        if len(cards) >= 11:
-            return formation, [(cid, p) for cid, p, sp in cards[:11]]
+
+        # Если меньше 11 — добиваем пустые слоты фантомным игроком рейтинг 40
+        if len(cards) < 11:
+            from bot.services.simulation import FORMATIONS_SLOTS
+            formation_slots = FORMATIONS_SLOTS.get(formation, FORMATIONS_SLOTS["4-4-2"])
+            filled_count = len(cards)
+            for i in range(filled_count, 11):
+                slot_pos = formation_slots[i] if i < len(formation_slots) else "CM"
+                phantom = PlayerModel(
+                    id=-1, name="(пусто)", position=slot_pos,
+                    positions_json=f'["{slot_pos}"]',
+                    overall_rating=1, club=None, nationality=None,
+                    photo_url=None, league_id=None, is_national_team=False,
+                )
+                cards.append((-1, phantom, slot_pos))
+
+        return formation, [(cid, p) for cid, p, sp in cards[:11]]
 
     # Фоллбэк: топ-11 по рейтингу
     from sqlalchemy import desc
+    from sqlalchemy.orm import joinedload
     result = await session.execute(
         select(UserCard)
         .where(UserCard.user_id == user_id)

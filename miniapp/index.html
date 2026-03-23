@@ -1009,11 +1009,11 @@ function setHint(visible) {
   h.classList.toggle('visible', visible);
 }
 
-function showToast(msg) {
+function showToast(msg, duration = 2500) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  setTimeout(() => t.classList.remove('show'), duration);
 }
 
 // ─── Tab switching ────────────────────────────────────────────────────────────
