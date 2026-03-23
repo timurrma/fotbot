@@ -1086,14 +1086,15 @@ function renderOpponentPitch(data) {
     for (const slot of row) {
       const p = slotMap[slot];
       if (p) {
-        const star = p.overall_rating >= 90 ? '👑' : p.overall_rating >= 85 ? '🌟' : '⭐';
-        const photo = p.photo_url
-          ? `<img src="${API_BASE}/api/photo?url=${encodeURIComponent(p.photo_url)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 2px;">`
+        const rat = p.rating ?? p.overall_rating;
+        const star = rat >= 90 ? '👑' : rat >= 85 ? '🌟' : '⭐';
+        const photo = p.photo
+          ? `<img src="${API_BASE}/api/photo?url=${encodeURIComponent(p.photo)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 2px;">`
           : `<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;margin:0 auto 2px">👤</div>`;
         html += `<div style="text-align:center;min-width:52px;max-width:60px;">
           ${photo}
           <div style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name.split(' ').pop()}</div>
-          <div style="font-size:10px;color:var(--gold)">${p.overall_rating}${star}</div>
+          <div style="font-size:10px;color:var(--gold)">${rat}${star}</div>
         </div>`;
       } else {
         html += `<div style="text-align:center;min-width:52px;max-width:60px;">
