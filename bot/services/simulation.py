@@ -157,8 +157,8 @@ def expected_goals(home_str: float, away_str: float) -> tuple[float, float]:
     diff = (home_str - away_str) / 10.0
     diff = max(-2.5, min(2.5, diff))
     # Уменьшили влияние разницы 0.5 → 0.3 (слабая команда имеет больше шансов)
-    home_lambda = base + diff * 0.3 + random.uniform(-0.4, 0.4)
-    away_lambda = base - diff * 0.3 + random.uniform(-0.4, 0.4)
+    home_lambda = base + diff * 0.4 + random.uniform(-0.4, 0.4)
+    away_lambda = base - diff * 0.4 + random.uniform(-0.4, 0.4)
     return max(0.1, home_lambda), max(0.1, away_lambda)
 
 
