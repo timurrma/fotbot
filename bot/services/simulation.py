@@ -212,8 +212,8 @@ def generate_events(
             ))
 
     # Красная карточка (с вероятностью 15%) — минута определяет момент перелома
-    red_minute: int | None = None
-    red_team: str | None = None
+    red_minute: Optional[int] = None
+    red_team: Optional[str] = None
     if random.random() < 0.15:
         team = random.choice(["home", "away"])
         lineup = home_lineup if team == "home" else away_lineup
@@ -362,7 +362,7 @@ def simulate_match(
     )
 
 
-def events_to_dict(events: list[MatchEvent], card_owner: dict[int, str] | None = None) -> list[dict]:
+def events_to_dict(events: list[MatchEvent], card_owner: Optional[dict] = None) -> list[dict]:
     """Сериализует события для хранения в БД и передачи в LLM."""
     card_owner = card_owner or {}
     result = []

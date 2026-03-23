@@ -38,13 +38,32 @@ async def _get_squad_cards(
     if squad_row and squad_row.slot_assignments:
         formation = squad_row.formation
         assignments = squad_row.slot_assignments
+        # Маппинг имён слотов miniapp → позиция схемы
+        SLOT_TO_POS = {
+            "GK": "GK",
+            "CB1": "CB", "CB2": "CB", "CB3": "CB",
+            "LB": "LB", "RB": "RB",
+            "CDM1": "CDM", "CDM2": "CDM",
+            "CM": "CM", "CM1": "CM", "CM2": "CM", "CM3": "CM",
+            "LM": "LM", "RM": "RM",
+            "CAM": "CAM",
+            "LW": "LW", "RW": "RW",
+            "ST": "ST", "ST1": "ST", "ST2": "ST",
+        }
+        # Порядок слотов по схеме (чтобы GK всегда первым)
+        SLOT_ORDER = ["GK", "CB1", "CB2", "CB3", "LB", "RB",
+                      "CDM1", "CDM2", "CM", "CM1", "CM2", "CM3",
+                      "LM", "RM", "CAM", "LW", "RW", "ST", "ST1", "ST2"]
+        ordered_slots = sorted(assignments.keys(), key=lambda s: SLOT_ORDER.index(s) if s in SLOT_ORDER else 99)
         cards = []
-        for _, card_id in sorted(assignments.items()):
+        for slot_name in ordered_slots:
+            card_id = assignments[slot_name]
             card = await session.get(UserCard, card_id, options=[joinedload(UserCard.player)])
             if card:
-                cards.append((card_id, card.player))
+                slot_pos = SLOT_TO_POS.get(slot_name, "CM")
+                cards.append((card_id, card.player, slot_pos))
         if len(cards) >= 11:
-            return formation, cards[:11]
+            return formation, [(cid, p) for cid, p, sp in cards[:11]]
 
     # Фоллбэк: топ-11 по рейтингу
     from sqlalchemy import desc

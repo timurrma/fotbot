@@ -818,6 +818,20 @@ function assignCard(card) {
     return;
   }
 
+  // Block GK ↔ outfield swap
+  const slotPos = SLOT_POSITION[selectedSlot];
+  const playerPositions = card.positions || [card.position];
+  const isPlayerGK = playerPositions.includes('GK');
+  const isSlotGK = slotPos === 'GK';
+  if (isPlayerGK && !isSlotGK) {
+    showToast('❌ Вратаря нельзя ставить на полевую позицию');
+    return;
+  }
+  if (!isPlayerGK && isSlotGK) {
+    showToast('❌ Полевого нельзя ставить в ворота');
+    return;
+  }
+
   // Remove this card from any other slot
   for (const [s, cid] of Object.entries(squad)) {
     if (cid === card.id) delete squad[s];
