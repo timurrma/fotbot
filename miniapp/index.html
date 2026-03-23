@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Состав команды</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!-- Set window.API_BASE before this file to override, or use ?api= query param -->
+<script>
+  // Default API base — override in config.js or via query param
+  window.API_BASE_DEFAULT = 'https://your-bot-api.railway.app';
+</script>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card-bg: #16213e;
+    --accent: #0f3460;
+    --green: #2d6a4f;
+    --green-light: #52b788;
+    --gold: #f4a261;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+    --slot-empty: rgba(255,255,255,0.08);
+    --slot-filled: rgba(82,183,136,0.2);
+    --slot-border: rgba(82,183,136,0.5);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── Header ─── */
+  .header {
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header h1 { font-size: 17px; font-weight: 700; flex: 1; }
+  .save-btn {
+    background: var(--green-light);
+    color: #0d1117;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .save-btn:active { opacity: 0.7; }
+
+  /* ─── Formation tabs ─── */
+  .formation-row {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .formation-row::-webkit-scrollbar { display: none; }
+  .f-tab {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1.5px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .f-tab.active {
+    border-color: var(--green-light);
+    color: var(--green-light);
+    background: rgba(82,183,136,0.1);
+  }
+
+  /* ─── Pitch ─── */
+  .pitch-container {
+    padding: 0 16px 12px;
+    position: relative;
+  }
+  .pitch {
+    background: linear-gradient(180deg, #1b4332 0%, #2d6a4f 50%, #1b4332 100%);
+    border-radius: 12px;
+    position: relative;
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+    overflow: hidden;
+  }
+  /* Field lines */
+  .pitch::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: rgba(255,255,255,0.15);
+  }
+  .pitch::after {
+    content: '';
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  .pitch-row {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .pitch-row:last-child { margin-bottom: 0; }
+
+  /* ─── Slot ─── */
+  .slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    width: 58px;
+  }
+  .slot-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--slot-empty);
+    border: 2px dashed rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    overflow: hidden;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .slot.filled .slot-avatar {
+    background: var(--slot-filled);
+    border: 2px solid var(--slot-border);
+  }
+  .slot.selected .slot-avatar {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(244,162,97,0.4);
+  }
+  .slot-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+  .slot-avatar .slot-icon {
+    color: rgba(255,255,255,0.3);
+    font-size: 20px;
+  }
+  .slot-rating {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: var(--card-bg);
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 3px;
+    color: var(--gold);
+  }
+  .slot-label {
+    font-size: 9px;
+    color: rgba(255,255,255,0.5);
+    margin-top: 3px;
+    text-align: center;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+  .slot-name {
+    font-size: 9px;
+    color: var(--text);
+    margin-top: 1px;
+    text-align: center;
+    max-width: 56px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 500;
+  }
+
+  /* ─── Player list ─── */
+  .section-title {
+    padding: 12px 16px 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+
+  .filter-row {
+    display: flex;
+    gap: 6px;
+    padding: 0 16px 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .filter-row::-webkit-scrollbar { display: none; }
+  .pos-filter {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pos-filter.active {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.3);
+    color: var(--text);
+  }
+
+  .player-list {
+    padding: 0 16px 100px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .player-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--card-bg);
+    border-radius: 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+  }
+  .player-card.selected {
+    border-color: var(--gold);
+    background: rgba(244,162,97,0.08);
+  }
+  .player-card.in-squad {
+    opacity: 0.5;
+  }
+  .player-card:active { opacity: 0.7; }
+
+  .player-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--accent);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--text-muted);
+    overflow: hidden;
+  }
+  .player-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  .player-info { flex: 1; min-width: 0; }
+  .player-name {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .player-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+
+  .player-rating {
+    font-size: 16px;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .rating-gold { color: var(--gold); }
+  .rating-silver { color: #c0c0c0; }
+  .rating-bronze { color: #cd7f32; }
+
+  /* ─── Hint banner ─── */
+  .hint {
+    margin: 0 16px 10px;
+    padding: 10px 12px;
+    background: rgba(244,162,97,0.12);
+    border: 1px solid rgba(244,162,97,0.3);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--gold);
+    text-align: center;
+    display: none;
+  }
+  .hint.visible { display: block; }
+
+  /* ─── Toast ─── */
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1e293b;
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+    border: 1px solid rgba(255,255,255,0.1);
+    z-index: 200;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ─── Loading ─── */
+  .loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    color: var(--text-muted);
+    font-size: 14px;
+    gap: 8px;
+  }
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-top-color: var(--green-light);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚽ Состав команды</h1>
+  <button class="save-btn" id="saveBtn" onclick="saveSquad()">Сохранить</button>
+</div>
+
+<!-- Formation tabs -->
+<div class="formation-row" id="formationRow"></div>
+
+<!-- Pitch -->
+<div class="pitch-container">
+  <div class="pitch" id="pitch">
+    <div class="loading"><div class="spinner"></div> Загрузка...</div>
+  </div>
+</div>
+
+<!-- Hint -->
+<div class="hint" id="hint">Выбери слот на поле, затем выбери игрока из списка</div>
+
+<!-- Player list -->
+<div class="section-title">Коллекция</div>
+<div class="filter-row" id="filterRow"></div>
+<div class="player-list" id="playerList">
+  <div class="loading"><div class="spinner"></div> Загрузка карточек...</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+// API base: use ?api= param, or window.API_BASE override, or default
+const API_BASE = new URLSearchParams(location.search).get('api')
+  || window.API_BASE
+  || window.API_BASE_DEFAULT
+  || '';
+
+const FORMATIONS = {
+  '4-4-2': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'RB'],
+    ['LM', 'CM1', 'CM2', 'RM'],
+    ['ST1', 'ST2'],
+  ],
+  '4-3-3': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'RB'],
+    ['CM1', 'CM2', 'CM3'],
+    ['LW', 'ST', 'RW'],
+  ],
+  '3-5-2': [
+    ['GK'],
+    ['CB1', 'CB2', 'CB3'],
+    ['LM', 'CDM1', 'CM', 'CDM2', 'RM'],
+    ['ST1', 'ST2'],
+  ],
+  '5-3-2': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'CB3', 'RB'],
+    ['CM1', 'CM2', 'CM3'],
+    ['ST1', 'ST2'],
+  ],
+};
+
+// Which slot names map to which position group
+const SLOT_POSITION = {
+  GK: 'GK',
+  LB: 'LB', RB: 'RB',
+  CB1: 'CB', CB2: 'CB', CB3: 'CB',
+  CDM1: 'CDM', CDM2: 'CDM',
+  LM: 'LM', RM: 'RM',
+  CM: 'CM', CM1: 'CM', CM2: 'CM', CM3: 'CM',
+  CAM: 'CAM',
+  LW: 'LW', RW: 'RW',
+  ST: 'ST', ST1: 'ST', ST2: 'ST',
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let tg = window.Telegram?.WebApp;
+let userId = null;
+let cards = [];          // all user cards from API
+let squad = {};          // {slot: card_id}
+let formation = '4-4-2';
+let selectedSlot = null; // slot name user clicked
+let posFilter = 'ALL';
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    tg.enableClosingConfirmation();
+    const u = tg.initDataUnsafe?.user;
+    if (u) userId = u.id;
+  }
+
+  // Fallback for testing outside Telegram
+  if (!userId) {
+    userId = new URLSearchParams(location.search).get('uid') || 123456;
+  }
+
+  renderFormationTabs();
+  await Promise.all([loadCards(), loadSquad()]);
+  renderPitch();
+  renderPlayerList();
+  renderFilterRow();
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+async function loadCards() {
+  try {
+    const r = await fetch(`${API_BASE}/api/cards?user_id=${userId}`);
+    cards = await r.json();
+    if (!Array.isArray(cards)) cards = [];
+    // Sort by rating desc
+    cards.sort((a, b) => b.rating - a.rating);
+  } catch(e) {
+    showToast('❌ Ошибка загрузки карточек');
+  }
+}
+
+async function loadSquad() {
+  try {
+    const r = await fetch(`${API_BASE}/api/squad?user_id=${userId}`);
+    const data = await r.json();
+    formation = data.formation || '4-4-2';
+    squad = {};
+    for (const [slot, cardId] of Object.entries(data.slots || {})) {
+      squad[slot] = Number(cardId);
+    }
+  } catch(e) {
+    // ignore, start fresh
+  }
+}
+
+async function saveSquad() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.textContent = '...';
+
+  const body = {
+    user_id: userId,
+    formation: formation,
+    slots: squad,
+  };
+
+  if (tg?.initData) {
+    body.initData = tg.initData;
+  }
+
+  try {
+    const r = await fetch(`${API_BASE}/api/squad`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (data.ok) {
+      showToast('✅ Состав сохранён!');
+      setTimeout(() => tg?.close(), 1500);
+    } else {
+      showToast('❌ ' + (data.error || 'Ошибка'));
+    }
+  } catch(e) {
+    showToast('❌ Нет соединения');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Сохранить';
+}
+
+// ─── Formation tabs ───────────────────────────────────────────────────────────
+function renderFormationTabs() {
+  const row = document.getElementById('formationRow');
+  row.innerHTML = '';
+  for (const f of Object.keys(FORMATIONS)) {
+    const btn = document.createElement('button');
+    btn.className = 'f-tab' + (f === formation ? ' active' : '');
+    btn.textContent = f;
+    btn.onclick = () => selectFormation(f);
+    row.appendChild(btn);
+  }
+}
+
+function selectFormation(f) {
+  formation = f;
+  squad = {}; // reset slots when formation changes
+  selectedSlot = null;
+  renderFormationTabs();
+  renderPitch();
+  renderPlayerList();
+  setHint(false);
+}
+
+// ─── Pitch ────────────────────────────────────────────────────────────────────
+function renderPitch() {
+  const pitch = document.getElementById('pitch');
+  const rows = FORMATIONS[formation] || [];
+  pitch.innerHTML = '';
+
+  for (const row of rows) {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'pitch-row';
+    for (const slotName of row) {
+      rowEl.appendChild(makeSlotEl(slotName));
+    }
+    pitch.appendChild(rowEl);
+  }
+}
+
+function makeSlotEl(slotName) {
+  const cardId = squad[slotName];
+  const card = cardId ? cards.find(c => c.id === cardId) : null;
+
+  const el = document.createElement('div');
+  el.className = 'slot' + (card ? ' filled' : '') + (selectedSlot === slotName ? ' selected' : '');
+  el.onclick = () => selectSlot(slotName);
+
+  const avatar = document.createElement('div');
+  avatar.className = 'slot-avatar';
+
+  if (card) {
+    if (card.photo) {
+      const img = document.createElement('img');
+      img.src = card.photo;
+      img.onerror = () => { img.replaceWith(document.createTextNode('👤')); };
+      avatar.appendChild(img);
+    } else {
+      avatar.textContent = '👤';
+    }
+    const ratingEl = document.createElement('div');
+    ratingEl.className = 'slot-rating';
+    ratingEl.textContent = card.rating;
+    avatar.appendChild(ratingEl);
+  } else {
+    const icon = document.createElement('span');
+    icon.className = 'slot-icon';
+    icon.textContent = slotName === 'GK' ? '🧤' : '+';
+    avatar.appendChild(icon);
+  }
+
+  const label = document.createElement('div');
+  label.className = 'slot-label';
+  label.textContent = slotName.replace(/\d/, '');
+
+  const nameEl = document.createElement('div');
+  nameEl.className = 'slot-name';
+  nameEl.textContent = card ? shortName(card.name) : '';
+
+  el.appendChild(avatar);
+  el.appendChild(label);
+  el.appendChild(nameEl);
+  return el;
+}
+
+function shortName(name) {
+  const parts = name.split(' ');
+  if (parts.length === 1) return name;
+  return parts[parts.length - 1]; // last name
+}
+
+function selectSlot(slotName) {
+  if (selectedSlot === slotName) {
+    // Deselect → clear this slot
+    delete squad[slotName];
+    selectedSlot = null;
+    setHint(false);
+  } else {
+    selectedSlot = slotName;
+    setHint(true);
+  }
+  renderPitch();
+  renderPlayerList();
+}
+
+// ─── Player list ──────────────────────────────────────────────────────────────
+const POSITIONS = ['ALL', 'GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'LM', 'RM', 'CAM', 'LW', 'RW', 'CF', 'ST'];
+
+function renderFilterRow() {
+  const row = document.getElementById('filterRow');
+  row.innerHTML = '';
+  for (const pos of POSITIONS) {
+    const btn = document.createElement('button');
+    btn.className = 'pos-filter' + (pos === posFilter ? ' active' : '');
+    btn.textContent = pos;
+    btn.onclick = () => { posFilter = pos; renderFilterRow(); renderPlayerList(); };
+    row.appendChild(btn);
+  }
+}
+
+function renderPlayerList() {
+  const list = document.getElementById('playerList');
+  list.innerHTML = '';
+
+  const assignedCardIds = new Set(Object.values(squad));
+  let filtered = cards;
+
+  if (posFilter !== 'ALL') {
+    filtered = cards.filter(c => c.position === posFilter || (c.positions || []).includes(posFilter));
+  }
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;font-size:13px;">Нет карточек</div>';
+    return;
+  }
+
+  for (const card of filtered) {
+    const inSquad = assignedCardIds.has(card.id) && squad[selectedSlot] !== card.id;
+    const isSelected = selectedSlot && squad[selectedSlot] === card.id;
+    list.appendChild(makeCardEl(card, inSquad, isSelected));
+  }
+}
+
+function makeCardEl(card, inSquad, isSelected) {
+  const el = document.createElement('div');
+  el.className = 'player-card' + (inSquad ? ' in-squad' : '') + (isSelected ? ' selected' : '');
+  el.onclick = () => assignCard(card);
+
+  // Photo
+  const photoEl = document.createElement('div');
+  photoEl.className = 'player-photo';
+  if (card.photo) {
+    const img = document.createElement('img');
+    img.src = card.photo;
+    img.onerror = () => { img.parentElement.textContent = '👤'; };
+    photoEl.appendChild(img);
+  } else {
+    photoEl.textContent = '👤';
+  }
+
+  // Info
+  const info = document.createElement('div');
+  info.className = 'player-info';
+  const name = document.createElement('div');
+  name.className = 'player-name';
+  name.textContent = card.name;
+  const meta = document.createElement('div');
+  meta.className = 'player-meta';
+  meta.textContent = `${card.position} · ${card.club || ''}`;
+  info.appendChild(name);
+  info.appendChild(meta);
+
+  // Rating
+  const rating = document.createElement('div');
+  rating.className = 'player-rating ' + ratingClass(card.rating);
+  rating.textContent = card.rating;
+
+  el.appendChild(photoEl);
+  el.appendChild(info);
+  el.appendChild(rating);
+  return el;
+}
+
+function ratingClass(r) {
+  if (r >= 85) return 'rating-gold';
+  if (r >= 75) return 'rating-silver';
+  return 'rating-bronze';
+}
+
+function assignCard(card) {
+  if (!selectedSlot) {
+    // No slot selected: just highlight card to hint
+    showToast('Сначала выбери слот на поле');
+    return;
+  }
+
+  // Remove this card from any other slot
+  for (const [s, cid] of Object.entries(squad)) {
+    if (cid === card.id) delete squad[s];
+  }
+
+  if (squad[selectedSlot] === card.id) {
+    // Tap same card → unassign
+    delete squad[selectedSlot];
+  } else {
+    squad[selectedSlot] = card.id;
+  }
+
+  selectedSlot = null;
+  setHint(false);
+  renderPitch();
+  renderPlayerList();
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function setHint(visible) {
+  const h = document.getElementById('hint');
+  h.classList.toggle('visible', visible);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
