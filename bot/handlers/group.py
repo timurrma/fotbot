@@ -65,12 +65,14 @@ async def cmd_standings(message: Message) -> None:
     if scorers:
         text += "\n⚽ <b>Бомбардиры</b>\n"
         for i, r in enumerate(scorers, 1):
-            text += f"  {i}. {r['player_name']} — {r['goals']} гол.\n"
+            owner = wl_map.get(r['user_id'], f"ID{r['user_id']}")
+            text += f"  {i}. {r['player_name']} (@{owner}) — {r['goals']} гол.\n"
 
     if assisters:
         text += "\n🎯 <b>Ассистенты</b>\n"
         for i, r in enumerate(assisters, 1):
-            text += f"  {i}. {r['player_name']} — {r['assists']} acc.\n"
+            owner = wl_map.get(r['user_id'], f"ID{r['user_id']}")
+            text += f"  {i}. {r['player_name']} (@{owner}) — {r['assists']} acc.\n"
 
     await message.reply(text, parse_mode="HTML")
 
