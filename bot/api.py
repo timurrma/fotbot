@@ -21,6 +21,36 @@ from sqlalchemy import func, select
 from bot.config import settings
 from bot.db.models import UserCard, UserSquad, PackHistory, Player, TransferListing, TransferOffer, Whitelist
 from bot.db.session import AsyncSessionLocal
+from bot.services.simulation import compute_penalty
+
+_SLOT_TO_POS = {
+    "GK": "GK",
+    "CB1": "CB", "CB2": "CB", "CB3": "CB",
+    "LB": "LB", "RB": "RB",
+    "CDM1": "CDM", "CDM2": "CDM",
+    "CM": "CM", "CM1": "CM", "CM2": "CM", "CM3": "CM",
+    "LM": "LM", "RM": "RM", "CAM": "CAM",
+    "LW": "LW", "RW": "RW",
+    "ST": "ST", "ST1": "ST", "ST2": "ST",
+}
+
+
+def _card_dict_with_penalty(card: UserCard, slot_name: str) -> dict:
+    p = card.player
+    slot_pos = _SLOT_TO_POS.get(slot_name, "CM")
+    penalty = compute_penalty(p, slot_pos)
+    effective = max(40, p.overall_rating + penalty)
+    return {
+        "card_id": card.id,
+        "player_id": p.id,
+        "name": p.name,
+        "club": p.club,
+        "position": p.position,
+        "rating": p.overall_rating,
+        "effective_rating": effective,
+        "penalty": penalty,
+        "photo": p.photo_url,
+    }
 
 logger = logging.getLogger(__name__)
 
@@ -530,6 +560,34 @@ async def post_accept_offer(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+async def get_squad_full(request: web.Request) -> web.Response:
+    """GET /api/squad_full?user_id=XXX — состав с штрафами и effective_rating."""
+    user_id_str = request.rel_url.query.get("user_id")
+    if not user_id_str:
+        return web.json_response({"error": "user_id required"}, status=400)
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        return web.json_response({"error": "invalid user_id"}, status=400)
+
+    from sqlalchemy.orm import joinedload as jl
+    async with AsyncSessionLocal() as session:
+        squad = await session.get(UserSquad, user_id)
+        if not squad:
+            return web.json_response({"formation": "4-4-2", "slots": []})
+        assignments = squad.slot_assignments
+        slots_out = []
+        for slot_name, card_id in assignments.items():
+            card = await session.get(UserCard, card_id, options=[jl(UserCard.player)])
+            if card:
+                slots_out.append({
+                    "slot": slot_name,
+                    "card_id": card_id,
+                    "player": _card_dict_with_penalty(card, slot_name),
+                })
+    return web.json_response({"formation": squad.formation, "slots": slots_out})
+
+
 async def get_users(request: web.Request) -> web.Response:
     """GET /api/users — список игроков вайтлиста."""
     async with AsyncSessionLocal() as session:
@@ -559,12 +617,12 @@ async def get_opponent_squad(request: web.Request) -> web.Response:
         assignments = squad.slot_assignments  # {slot: user_card_id}
         slots_out = []
         for slot_name, card_id in assignments.items():
-            card = await session.get(UserCard, card_id)
+            card = await session.get(UserCard, card_id, options=[__import__('sqlalchemy.orm', fromlist=['joinedload']).joinedload(UserCard.player)])
             if card:
                 slots_out.append({
                     "slot": slot_name,
                     "card_id": card_id,
-                    "player": _card_dict(card),
+                    "player": _card_dict_with_penalty(card, slot_name),
                 })
 
     return web.json_response({"formation": squad.formation, "slots": slots_out})
@@ -599,6 +657,7 @@ def create_api_app() -> web.Application:
     app.router.add_get("/api/lastpack", get_last_pack)
     app.router.add_get("/api/users", get_users)
     app.router.add_get("/api/opponent_squad", get_opponent_squad)
+    app.router.add_get("/api/squad_full", get_squad_full)
     app.router.add_get("/api/market", get_market)
     app.router.add_post("/api/market/list", post_list_card)
     app.router.add_post("/api/market/cancel", post_cancel_listing)
