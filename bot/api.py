@@ -16,7 +16,7 @@ from typing import Optional
 from urllib.parse import parse_qsl
 
 from aiohttp import web
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from bot.config import settings
 from bot.db.models import UserCard, UserSquad, PackHistory, Player, TransferListing, TransferOffer, Whitelist
@@ -282,6 +282,16 @@ async def post_list_card(request: web.Request) -> web.Response:
         )
         if existing.scalar_one_or_none():
             return web.json_response({"error": "Карточка уже на рынке"}, status=400)
+
+        # Проверяем лимит 3 активных листинга
+        count_result = await session.execute(
+            select(func.count()).select_from(TransferListing).where(
+                TransferListing.user_id == user_id,
+                TransferListing.status == "active",
+            )
+        )
+        if count_result.scalar() >= 3:
+            return web.json_response({"error": "Максимум 3 карточки на рынке одновременно"}, status=400)
 
         listing = TransferListing(user_id=user_id, card_id=card_id, status="active")
         session.add(listing)
