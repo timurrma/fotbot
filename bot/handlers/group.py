@@ -142,8 +142,7 @@ async def cmd_top(message: Message) -> None:
     text = _format_with_owners(scorers, "⚽ Бомбардиры всех времён", "goals", wl_map)
     text += "\n\n" + _format_with_owners(assisters, "🎯 Ассистенты всех времён", "assists", wl_map)
     text += "\n\n" + _format_combined(combined, "🏆 Гол+пас всех времён", wl_map)
-    if mvp:
-        text += "\n\n" + _format_mvp(mvp, "🏅 MVP всех времён", wl_map)
+    text += "\n\n" + _format_mvp(mvp, "🏅 MVP всех времён", wl_map)
     await message.reply(text, parse_mode="HTML")
 
 
@@ -161,8 +160,7 @@ async def cmd_topweek(message: Message) -> None:
         wl_map = {w.user_id: (w.username or f"ID{w.user_id}") for w in wl_result.scalars().all()}
     text = _format_with_owners(scorers, "⚽ Бомбардиры этой недели", "goals", wl_map)
     text += "\n\n" + _format_with_owners(assisters, "🎯 Ассистенты этой недели", "assists", wl_map)
-    if mvp:
-        text += "\n\n" + _format_mvp(mvp, "🏅 MVP этой недели", wl_map)
+    text += "\n\n" + _format_mvp(mvp, "🏅 MVP этой недели", wl_map)
     await message.reply(text, parse_mode="HTML")
 
 
