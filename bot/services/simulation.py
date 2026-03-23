@@ -54,6 +54,10 @@ FORMATIONS_SLOTS: dict[str, list[str]] = {
     "4-3-3": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CDM", "LW", "RW", "ST"],
     "3-5-2": ["GK", "CB", "CB", "CB", "CM", "CM", "CDM", "LM", "RM", "ST", "ST"],
     "5-3-2": ["GK", "CB", "CB", "CB", "LB", "RB", "CM", "CM", "CDM", "ST", "ST"],
+    "4-2-3-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "LW", "RW", "ST"],
+    "4-1-4-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "LM", "RM", "ST"],
+    "4-5-1": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "LM", "RM", "ST"],
+    "3-4-3": ["GK", "CB", "CB", "CB", "LM", "CM", "CM", "RM", "LW", "ST", "RW"],
 }
 
 
@@ -332,6 +336,28 @@ def generate_events(
             minute_lo=1, minute_hi=90,
         )
         events.extend(phase)
+
+    # Гол в добавленное время (5% шанс, 88-94 мин)
+    if random.random() < 0.05:
+        team = random.choice(["home", "away"])
+        lineup = home_lineup if team == "home" else away_lineup
+        stats = home_stats if team == "home" else away_stats
+        minute = random.randint(88, 94)
+        while minute in used_minutes:
+            minute = random.randint(88, 95)
+        used_minutes.add(minute)
+        scorer = _pick_by_prob(lineup, GOAL_PROBS)
+        assister_candidates = [s for s in lineup if s != scorer]
+        assister = _pick_by_prob(assister_candidates, ASSIST_PROBS) if random.random() < 0.7 else None
+        events.append(MatchEvent(minute=minute, event_type="goal", scorer_slot=scorer, assist_slot=assister, team=team))
+        if scorer:
+            cid = scorer.user_card_id
+            stats.setdefault(cid, {"goals": 0, "assists": 0, "player_id": scorer.player.id})
+            stats[cid]["goals"] += 1
+        if assister:
+            cid = assister.user_card_id
+            stats.setdefault(cid, {"goals": 0, "assists": 0, "player_id": assister.player.id})
+            stats[cid]["assists"] += 1
 
     # Жёлтые карточки (1-3 штуки)
     for _ in range(random.randint(1, 3)):
