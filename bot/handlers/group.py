@@ -72,6 +72,7 @@ async def cmd_myteam(message: Message) -> None:
             if card:
                 r = card.player.overall_rating
                 icon = "👑" if r >= 90 else "🌟" if r >= 85 else "⭐"
-                lines.append(f"  {slot}: {card.player.name} — {r}{icon}")
+                club = f" ({card.player.club})" if card.player.club else ""
+                lines.append(f"  {slot}: {card.player.name}{club} — {r}{icon}")
 
     await message.reply("\n".join(lines))
