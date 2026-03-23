@@ -1,6 +1,6 @@
 """
-LLM-комментатор матча через OpenAI GPT-4.1 nano.
-Публикует матч двумя таймами по 5-6 сообщений каждый.
+LLM-комментатор матча.
+Поддерживает OpenAI и OpenRouter (переключается через LLM_PROVIDER в .env).
 """
 import json
 import os
@@ -9,6 +9,19 @@ from openai import AsyncOpenAI
 
 from bot.config import settings
 from bot.services.simulation import MatchResult
+
+
+def _make_client() -> tuple[AsyncOpenAI, str]:
+    """Возвращает (client, model) в зависимости от LLM_PROVIDER."""
+    if settings.llm_provider == "openrouter":
+        client = AsyncOpenAI(
+            api_key=settings.openrouter_api_key,
+            base_url="https://openrouter.ai/api/v1",
+        )
+        return client, "qwen/qwen3.5-plus-02-15"
+    else:
+        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        return client, "gpt-5.4-mini"
 
 
 def _load_skill_prompt() -> str:
@@ -53,10 +66,11 @@ def _build_half_payload(
 
 async def commentate_half(
     client: AsyncOpenAI,
+    model: str,
     skill_prompt: str,
     payload: dict,
 ) -> list[str]:
-    """Генерирует 5-6 сообщений для одного тайма через GPT-4.1 nano."""
+    """Генерирует 5-6 сообщений для одного тайма."""
     user_message = (
         f"Прокомментируй {'первый' if payload['half'] == 1 else 'второй'} тайм матча. "
         f"Сделай 5-6 коротких живых сообщений.\n\n"
@@ -64,7 +78,7 @@ async def commentate_half(
     )
 
     response = await client.chat.completions.create(
-        model="gpt-5.4-mini",
+        model=model,
         max_completion_tokens=1500,
         messages=[
             {"role": "system", "content": skill_prompt},
@@ -99,7 +113,7 @@ async def commentate_match(
     Генерирует полный комментарий матча: анонс + 1 тайм + перерыв + 2 тайм + итог.
     Возвращает список строк — каждая строка отдельное Telegram-сообщение.
     """
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    client, model = _make_client()
     skill_prompt = _load_skill_prompt()
 
     first_half_events, second_half_events = _split_events_by_half(events_data)
@@ -121,7 +135,7 @@ async def commentate_match(
     # Первый тайм
     try:
         first_half_msgs = await commentate_half(
-            client, skill_prompt,
+            client, model, skill_prompt,
             _build_half_payload(
                 home_username, away_username,
                 half=1,
@@ -142,7 +156,7 @@ async def commentate_match(
     # Второй тайм
     try:
         second_half_msgs = await commentate_half(
-            client, skill_prompt,
+            client, model, skill_prompt,
             _build_half_payload(
                 home_username, away_username,
                 half=2,
