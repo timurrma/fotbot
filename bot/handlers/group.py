@@ -15,6 +15,15 @@ from bot.services.tournament import build_standings_text, get_or_create_tourname
 router = Router()
 
 
+@router.message(Command("start"))
+async def cmd_start_group(message: Message) -> None:
+    """Отвечаем на /start в группе — просим написать в ЛС."""
+    await message.reply(
+        "👋 Привет! Напиши мне в личные сообщения, чтобы начать игру.",
+        parse_mode=None,
+    )
+
+
 @router.message(Command("standings"))
 async def cmd_standings(message: Message) -> None:
     """Турнирная таблица текущей недели."""
