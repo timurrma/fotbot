@@ -374,6 +374,7 @@
 
 <div class="header">
   <h1>⚽ Состав команды</h1>
+  <button class="save-btn" style="background:transparent;color:var(--text-muted);font-size:20px;padding:4px 10px;" onclick="reloadData()" title="Обновить">🔄</button>
   <button class="save-btn" id="saveBtn" onclick="saveSquad()">Сохранить</button>
 </div>
 
@@ -482,9 +483,15 @@ async function init() {
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
+async function reloadData() {
+  await Promise.all([loadCards(), loadSquad()]);
+  renderPitch();
+  renderPlayerList();
+}
+
 async function loadCards() {
   try {
-    const r = await fetch(`${API_BASE}/api/cards?user_id=${userId}`);
+    const r = await fetch(`${API_BASE}/api/cards?user_id=${userId}`, { cache: 'no-store' });
     cards = await r.json();
     if (!Array.isArray(cards)) cards = [];
     // Sort by rating desc
@@ -496,7 +503,7 @@ async function loadCards() {
 
 async function loadSquad() {
   try {
-    const r = await fetch(`${API_BASE}/api/squad?user_id=${userId}`);
+    const r = await fetch(`${API_BASE}/api/squad?user_id=${userId}`, { cache: 'no-store' });
     const data = await r.json();
     formation = data.formation || '4-4-2';
     squad = {};
