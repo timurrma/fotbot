@@ -98,18 +98,16 @@ class PackHistory(Base):
 
 
 class Tournament(Base):
-    """Еженедельный турнир."""
+    """Турнир."""
     __tablename__ = "tournaments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    week_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    week_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending / running / finished
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
     matches: Mapped[list["Match"]] = relationship("Match", back_populates="tournament")
-
-    __table_args__ = (UniqueConstraint("week_number", "year", name="uq_tournament_week"),)
 
 
 class Match(Base):

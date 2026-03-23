@@ -61,19 +61,13 @@ async def _get_squad_cards(
 
 
 async def get_or_create_tournament(session: AsyncSession) -> Tournament:
-    now = datetime.now(timezone.utc)
-    week = now.isocalendar()[1]
-    year = now.year
-
+    """Возвращает активный или последний турнир."""
     result = await session.execute(
-        select(Tournament).where(
-            Tournament.week_number == week,
-            Tournament.year == year,
-        )
+        select(Tournament).order_by(Tournament.id.desc()).limit(1)
     )
     t = result.scalar_one_or_none()
     if not t:
-        t = Tournament(week_number=week, year=year, status="pending")
+        t = Tournament(status="pending")
         session.add(t)
         await session.commit()
         await session.refresh(t)

@@ -116,46 +116,29 @@ async def cmd_starttournament(message: Message) -> None:
     if not is_admin(message.from_user.id):
         return
 
-    from datetime import datetime, timezone
     from bot.db.models import Tournament
-    from bot.services.tournament import ensure_matches_created
-
-    now = datetime.now(timezone.utc)
-    week = now.isocalendar()[1]
-    year = now.year
+    from bot.services.tournament import ensure_matches_created, get_active_tournament
 
     async with AsyncSessionLocal() as session:
-        from sqlalchemy import select as sa_select
-        result = await session.execute(
-            sa_select(Tournament).where(
-                Tournament.week_number == week,
-                Tournament.year == year,
-            )
-        )
-        t = result.scalar_one_or_none()
+        active = await get_active_tournament(session)
+        if active:
+            await message.reply("⚠️ Турнир уже активен!")
+            return
 
-        if t:
-            if t.status == "running":
-                await message.reply("⚠️ Турнир уже активен!")
-                return
-            # Перезапускаем завершённый или ожидающий
-            t.status = "running"
-        else:
-            t = Tournament(week_number=week, year=year, status="running")
-            session.add(t)
-
+        t = Tournament(status="running")
+        session.add(t)
         await session.commit()
         await session.refresh(t)
         await ensure_matches_created(session, t)
 
     await message.bot.send_message(
         settings.group_id,
-        f"🏆 <b>Турнир недели #{week} начался!</b>\n\n"
+        f"🏆 <b>Новый турнир начался!</b>\n\n"
         "Настройте состав в боте и ждите матчей.\n"
         "Матчи запускаются командой /nextmatch",
         parse_mode="HTML",
     )
-    await message.reply(f"✅ Турнир #{week} запущен!")
+    await message.reply(f"✅ Турнир #{t.id} запущен!")
 
 
 @router.message(Command("nextmatch"))
