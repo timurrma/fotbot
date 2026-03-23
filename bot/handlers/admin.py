@@ -37,7 +37,12 @@ async def cmd_adduser(message: Message) -> None:
     async with AsyncSessionLocal() as session:
         existing = await session.get(Whitelist, target_id)
         if existing:
-            await message.reply(f"ID {target_id} уже в whitelist.")
+            if username:
+                existing.username = username
+                await session.commit()
+                await message.reply(f"✅ Username обновлён: ID {target_id} → @{username}.")
+            else:
+                await message.reply(f"ID {target_id} уже в whitelist.")
             return
         entry = Whitelist(user_id=target_id, username=username)
         session.add(entry)

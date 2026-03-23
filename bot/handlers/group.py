@@ -117,11 +117,16 @@ async def cmd_myteam(message: Message) -> None:
             from bot.db.models import Whitelist
             async with AsyncSessionLocal() as session:
                 result = await session.execute(select(Whitelist))
+                found = False
                 for wl in result.scalars().all():
                     if wl.username and wl.username.lower() == target_username:
                         user_id = wl.user_id
                         display_name = f"Состав @{target_username}"
+                        found = True
                         break
+            if not found:
+                await message.reply(f"❌ Игрок @{target_username} не найден. Проверь username в /adduser.")
+                return
 
     async with AsyncSessionLocal() as session:
         squad = await session.get(UserSquad, user_id)
