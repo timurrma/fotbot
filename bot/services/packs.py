@@ -228,6 +228,8 @@ async def send_pack_with_photos(
 
         try:
             await bot.send_media_group(chat_id=chat_id, media=media)
+            # Отдельным сообщением — полный список всех игроков
+            await bot.send_message(chat_id=chat_id, text=format_pack_announcement(username, players, pack_type))
             return
         except Exception:
             pass  # фоллбэк на текст если фото недоступны
