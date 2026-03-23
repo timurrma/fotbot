@@ -71,14 +71,15 @@ async def _pick_player(
     rating_max: int,
     position: str | None = None,
     exclude_ids: set[int] | None = None,
+    weighted: bool = False,
 ) -> Player | None:
-    """Выбирает случайного игрока из БД в заданном диапазоне рейтинга."""
+    """Выбирает случайного игрока из БД в заданном диапазоне рейтинга.
+    weighted=True — чем выше рейтинг, тем ниже вероятность выбора."""
     query = select(Player).where(
         Player.overall_rating >= rating_min,
         Player.overall_rating <= rating_max,
     )
     if position:
-        # Ищем игроков с основной позицией из подходящей группы
         allowed = POSITION_GROUPS.get(position, [position])
         query = query.where(Player.position.in_(allowed))
     if exclude_ids:
@@ -96,7 +97,13 @@ async def _pick_player(
             query2 = query2.where(Player.id.notin_(exclude_ids))
         result2 = await session.execute(query2)
         players = result2.scalars().all()
-    return random.choice(players) if players else None
+    if not players:
+        return None
+    if weighted:
+        # Вес обратно пропорционален рейтингу: 85→15, 90→10, 95→5, 99→1
+        weights = [max(1, 100 - p.overall_rating) for p in players]
+        return random.choices(players, weights=weights, k=1)[0]
+    return random.choice(players)
 
 
 async def open_pack(
@@ -159,10 +166,10 @@ async def _open_starter_pack(
         force_high = (is_last and not has_high)
 
         r_min, r_max = _pick_rating("starter", force_high=force_high)
-        player = await _pick_player(session, r_min, r_max, position=pos, exclude_ids=used_ids)
+        player = await _pick_player(session, r_min, r_max, position=pos, exclude_ids=used_ids, weighted=force_high)
         if player is None:
             # Фоллбэк без позиции
-            player = await _pick_player(session, r_min, r_max, exclude_ids=used_ids)
+            player = await _pick_player(session, r_min, r_max, exclude_ids=used_ids, weighted=force_high)
         if player:
             players_out.append(player)
             used_ids.add(player.id)
