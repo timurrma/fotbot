@@ -40,6 +40,14 @@ async def cmd_start(message: Message) -> None:
 
         already_has = await has_starter_pack(session, user_id)
 
+        # Если pack_history есть но карточек нет — выдаём заново
+        if already_has:
+            cards_result = await session.execute(
+                select(UserCard).where(UserCard.user_id == user_id).limit(1)
+            )
+            if not cards_result.scalar_one_or_none():
+                already_has = False
+
         if not already_has:
             await message.answer("👋 Добро пожаловать! Открываю твой стартовый пак...")
             await asyncio.sleep(1)
