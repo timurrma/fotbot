@@ -293,10 +293,31 @@ async def post_list_card(request: web.Request) -> web.Response:
         if count_result.scalar() >= 3:
             return web.json_response({"error": "Максимум 3 карточки на рынке одновременно"}, status=400)
 
+        # Получаем username для объявления
+        wl = await session.get(Whitelist, user_id)
+        username = wl.username if wl and wl.username else f"ID{user_id}"
+
         listing = TransferListing(user_id=user_id, card_id=card_id, status="active")
         session.add(listing)
         await session.commit()
         await session.refresh(listing)
+
+        player = card.player
+        pos = player.position
+        rating = player.overall_rating
+
+    # Объявление в беседу
+    try:
+        bot = request.app["bot"]
+        text = (
+            f"🔄 <b>{username}</b> выставил карточку на трансферный рынок!\n"
+            f"├ <b>{player.name}</b> — {rating} ⭐\n"
+            f"└ Позиция: {pos}\n\n"
+            f"Открой мини-приложение, чтобы предложить обмен."
+        )
+        await bot.send_message(settings.group_id, text)
+    except Exception:
+        pass
 
     return web.json_response({"ok": True, "listing_id": listing.id})
 
@@ -450,7 +471,20 @@ async def post_accept_offer(request: web.Request) -> web.Response:
     offer_id = int(body.get("offer_id", 0))
 
     from bot.services.transfers import accept_transfer
+    announce_data = None
     async with AsyncSessionLocal() as session:
+        # Собираем данные для объявления до accept (пока offer ещё pending)
+        offer_pre = await session.get(TransferOffer, offer_id)
+        if offer_pre and offer_pre.to_user_id == user_id:
+            wl_from = await session.get(Whitelist, offer_pre.from_user_id)
+            wl_to = await session.get(Whitelist, user_id)
+            from_name = wl_from.username if wl_from and wl_from.username else f"ID{offer_pre.from_user_id}"
+            to_name = wl_to.username if wl_to and wl_to.username else f"ID{user_id}"
+            offer_card = await session.get(UserCard, offer_pre.offer_card_id)
+            want_card = await session.get(UserCard, offer_pre.want_card_id)
+            if offer_card and want_card:
+                announce_data = (from_name, to_name, offer_card.player, want_card.player)
+
         ok, msg = await accept_transfer(session, offer_id, user_id)
         if not ok:
             return web.json_response({"error": msg}, status=400)
@@ -478,6 +512,20 @@ async def post_accept_offer(request: web.Request) -> web.Response:
             for o in other_offers.scalars().all():
                 o.status = "cancelled"
             await session.commit()
+
+    # Объявление об обмене в беседу
+    if announce_data:
+        try:
+            from_name, to_name, offer_player, want_player = announce_data
+            bot = request.app["bot"]
+            text = (
+                f"🤝 Трансфер состоялся!\n"
+                f"├ <b>{from_name}</b> отдаёт: <b>{offer_player.name}</b> — {offer_player.overall_rating} ⭐\n"
+                f"└ <b>{to_name}</b> отдаёт: <b>{want_player.name}</b> — {want_player.overall_rating} ⭐"
+            )
+            await bot.send_message(settings.group_id, text)
+        except Exception:
+            pass
 
     return web.json_response({"ok": True})
 
