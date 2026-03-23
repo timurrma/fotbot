@@ -27,11 +27,19 @@ PACK_WEIGHTS = {
         "weights": [30, 35, 35],
     },
     "starter": {
-        "ranges": [(65, 74), (75, 84), (85, 99)],
+        "ranges": [(65, 74), (75, 82), (85, 99)],
         "weights": [90, 10, 0],
     },
     "russia": {
         "ranges": [(65, 74), (75, 84), (85, 99)],
+        "weights": [55, 35, 10],
+    },
+    "brazil": {
+        "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
+        "weights": [55, 30, 13, 2],
+    },
+    "turkey": {
+        "ranges": [(65, 74), (75, 78), (79, 99)],
         "weights": [55, 35, 10],
     },
 }
@@ -63,7 +71,7 @@ def _pick_rating(pack_type: str, force_high: bool = False) -> tuple[int, int]:
     """Возвращает (min, max) диапазон рейтинга согласно весам пака."""
     cfg = PACK_WEIGHTS[pack_type]
     if force_high:
-        return (85, 88)
+        return (80, 82)
     ranges, weights = cfg["ranges"], cfg["weights"]
     chosen = random.choices(ranges, weights=weights, k=1)[0]
     return chosen
@@ -127,7 +135,10 @@ async def open_pack(
         players_out = await _open_starter_pack(session, user_id, used_player_ids)
     elif pack_type == "russia":
         players_out = await _open_russia_pack(session, used_player_ids)
-        # russia-пак = 1 карточка, выход сразу
+    elif pack_type == "brazil":
+        players_out = await _open_brazil_pack(session, used_player_ids)
+    elif pack_type == "turkey":
+        players_out = await _open_turkey_pack(session, used_player_ids)
     else:
         count = 5
         # weekly / special
@@ -180,40 +191,110 @@ async def _open_starter_pack(
         if player:
             players_out.append(player)
             used_ids.add(player.id)
-            if player.overall_rating >= 85:
+            if player.overall_rating >= 80:
                 has_high = True
 
     return players_out
+
+
+ARSHAVIN_ID = 2000032
 
 
 async def _open_russia_pack(
     session: AsyncSession,
     used_ids: set[int],
 ) -> list[Player]:
-    """Россия-пак: 1 игрок сборной России с взвешенной вероятностью по диапазонам."""
-    # Диапазоны: 65-74 (55%), 75-78 (35%), 79+ (10%)
+    """Россия-пак: 1 игрок сборной России с взвешенной вероятностью по диапазонам.
+    1% шанс выбить А. Аршавина (id=2000032, 90 рейтинг).
+    """
+    # 1% шанс на Аршавина
+    if ARSHAVIN_ID not in used_ids and random.random() < 0.01:
+        arshavin = await session.get(Player, ARSHAVIN_ID)
+        if arshavin:
+            return [arshavin]
+
+    # Диапазоны: 65-74 (55%), 75-78 (35%), 79+ (10%), исключая Аршавина
     ranges = [(65, 74), (75, 78), (79, 99)]
     weights = [55, 35, 10]
     r_min, r_max = random.choices(ranges, weights=weights, k=1)[0]
 
+    exclude = used_ids | {ARSHAVIN_ID}
     query = select(Player).where(
         Player.nationality == "Russia",
         Player.overall_rating >= r_min,
         Player.overall_rating <= r_max,
+        Player.id.notin_(exclude),
     )
-    if used_ids:
-        query = query.where(Player.id.notin_(used_ids))
     result = await session.execute(query)
     players = result.scalars().all()
 
     if not players:
-        # Фоллбэк — любой русский
-        query2 = select(Player).where(Player.nationality == "Russia")
-        if used_ids:
-            query2 = query2.where(Player.id.notin_(used_ids))
+        # Фоллбэк — любой русский кроме Аршавина
+        query2 = select(Player).where(
+            Player.nationality == "Russia",
+            Player.id.notin_(exclude),
+        )
         result2 = await session.execute(query2)
         players = result2.scalars().all()
 
+    if not players:
+        return []
+    return [random.choice(players)]
+
+
+async def _open_brazil_pack(
+    session: AsyncSession,
+    used_ids: set[int],
+) -> list[Player]:
+    """Бразилия-пак: 2 игрока сборной Бразилии."""
+    players_out: list[Player] = []
+    for _ in range(2):
+        cfg = PACK_WEIGHTS["brazil"]
+        r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
+        query = select(Player).where(
+            Player.nationality == "Brazil",
+            Player.overall_rating >= r_min,
+            Player.overall_rating <= r_max,
+            Player.id.notin_(used_ids) if used_ids else True,
+        )
+        result = await session.execute(query)
+        players = result.scalars().all()
+        if not players:
+            query2 = select(Player).where(
+                Player.nationality == "Brazil",
+                Player.id.notin_(used_ids) if used_ids else True,
+            )
+            result2 = await session.execute(query2)
+            players = result2.scalars().all()
+        if players:
+            p = random.choice(players)
+            players_out.append(p)
+            used_ids.add(p.id)
+    return players_out
+
+
+async def _open_turkey_pack(
+    session: AsyncSession,
+    used_ids: set[int],
+) -> list[Player]:
+    """Турция-пак: 1 игрок сборной Турции."""
+    cfg = PACK_WEIGHTS["turkey"]
+    r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
+    query = select(Player).where(
+        Player.nationality == "Türkiye",
+        Player.overall_rating >= r_min,
+        Player.overall_rating <= r_max,
+        Player.id.notin_(used_ids) if used_ids else True,
+    )
+    result = await session.execute(query)
+    players = result.scalars().all()
+    if not players:
+        query2 = select(Player).where(
+            Player.nationality == "Türkiye",
+            Player.id.notin_(used_ids) if used_ids else True,
+        )
+        result2 = await session.execute(query2)
+        players = result2.scalars().all()
     if not players:
         return []
     return [random.choice(players)]
@@ -264,7 +345,7 @@ async def has_starter_pack(session: AsyncSession, user_id: int) -> bool:
 
 def format_pack_announcement(username: str, players: list[Player], pack_type: str = "weekly") -> str:
     """Формирует текстовый анонс открытия пака (без фото)."""
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция"}
     header = stars.get(pack_type, "🎴")
 
     lines = [f"{header} @{username} открыл пак!\n"]
@@ -290,7 +371,7 @@ async def send_pack_with_photos(
     """
     from aiogram.types import InputMediaPhoto
 
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция"}
     header = stars.get(pack_type, "🎴")
 
     # Берём только игроков с фото (макс 10 для медиагруппы)
