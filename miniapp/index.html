@@ -451,6 +451,7 @@
 <div class="tab-nav">
   <button id="tab-squad" class="active" onclick="switchTab('squad')">⚽ Состав</button>
   <button id="tab-transfers" onclick="switchTab('transfers')">🔄 Трансферы</button>
+  <button id="tab-opponent" onclick="switchTab('opponent')">👥 Соперник</button>
 </div>
 
 <!-- ── SQUAD TAB ── -->
@@ -485,6 +486,15 @@
   <!-- Рынок -->
   <div class="section-title">🏪 Трансферный рынок</div>
   <div id="marketList"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+
+<!-- ── OPPONENT TAB ── -->
+<div id="page-opponent" style="display:none; padding-bottom: 40px;">
+  <div style="padding: 12px 16px;">
+    <div class="section-title" style="margin-bottom:8px">👥 Состав соперника</div>
+    <div id="opponentSelect" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px"></div>
+    <div id="opponentPitch"></div>
+  </div>
 </div>
 
 <!-- Toast -->
@@ -1013,15 +1023,89 @@ function switchTab(tab) {
   currentTab = tab;
   document.getElementById('page-squad').style.display = tab === 'squad' ? '' : 'none';
   document.getElementById('page-transfers').style.display = tab === 'transfers' ? '' : 'none';
+  document.getElementById('page-opponent').style.display = tab === 'opponent' ? '' : 'none';
   document.getElementById('saveBtn').style.display = tab === 'squad' ? '' : 'none';
   document.getElementById('tab-squad').classList.toggle('active', tab === 'squad');
   document.getElementById('tab-transfers').classList.toggle('active', tab === 'transfers');
+  document.getElementById('tab-opponent').classList.toggle('active', tab === 'opponent');
   if (tab === 'transfers') loadMarket();
+  if (tab === 'opponent') loadOpponentTab();
 }
 
 function reloadAll() {
   if (currentTab === 'squad') reloadData();
-  else loadMarket();
+  else if (currentTab === 'transfers') loadMarket();
+  else if (currentTab === 'opponent') loadOpponentTab();
+}
+
+// ─── Opponent tab ─────────────────────────────────────────────────────────────
+let opponentUsers = [];
+let selectedOpponentId = null;
+
+async function loadOpponentTab() {
+  if (!opponentUsers.length) {
+    const r = await fetch(`${API_BASE}/api/users`);
+    opponentUsers = await r.json();
+  }
+  const others = opponentUsers.filter(u => u.user_id !== userId);
+  const sel = document.getElementById('opponentSelect');
+  sel.innerHTML = others.map(u => `
+    <button class="f-tab ${selectedOpponentId === u.user_id ? 'active' : ''}"
+      onclick="selectOpponent(${u.user_id})">${u.username}</button>
+  `).join('');
+  if (!selectedOpponentId && others.length) selectOpponent(others[0].user_id);
+}
+
+async function selectOpponent(uid) {
+  selectedOpponentId = uid;
+  // обновить кнопки
+  document.querySelectorAll('#opponentSelect .f-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === opponentUsers.find(u => u.user_id === uid)?.username);
+  });
+  const pitch = document.getElementById('opponentPitch');
+  pitch.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  const r = await fetch(`${API_BASE}/api/opponent_squad?user_id=${uid}`);
+  const data = await r.json();
+  renderOpponentPitch(data);
+}
+
+function renderOpponentPitch(data) {
+  const formation = data.formation || '4-4-2';
+  const rows = FORMATIONS[formation] || FORMATIONS['4-4-2'];
+  // slot -> player map
+  const slotMap = {};
+  (data.slots || []).forEach(s => { slotMap[s.slot] = s.player; });
+
+  // Показываем только основной состав (11 слотов из схемы)
+  const mainSlots = rows.flat();
+
+  let html = `<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;text-align:center">${formation}</div>`;
+  html += '<div style="background:linear-gradient(180deg,#2d5a27,#1a3a15);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">';
+  for (const row of rows) {
+    html += '<div style="display:flex;justify-content:center;gap:8px;">';
+    for (const slot of row) {
+      const p = slotMap[slot];
+      if (p) {
+        const star = p.overall_rating >= 90 ? '👑' : p.overall_rating >= 85 ? '🌟' : '⭐';
+        const photo = p.photo_url
+          ? `<img src="${API_BASE}/api/photo?url=${encodeURIComponent(p.photo_url)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 2px;">`
+          : `<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:14px;margin:0 auto 2px">👤</div>`;
+        html += `<div style="text-align:center;min-width:52px;max-width:60px;">
+          ${photo}
+          <div style="font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.name.split(' ').pop()}</div>
+          <div style="font-size:10px;color:var(--gold)">${p.overall_rating}${star}</div>
+        </div>`;
+      } else {
+        html += `<div style="text-align:center;min-width:52px;max-width:60px;">
+          <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.08);margin:0 auto 2px;border:1px dashed rgba(255,255,255,0.2)"></div>
+          <div style="font-size:10px;color:var(--text-muted)">${slot}</div>
+        </div>`;
+      }
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  document.getElementById('opponentPitch').innerHTML = html;
 }
 
 // ─── Transfer market ──────────────────────────────────────────────────────────

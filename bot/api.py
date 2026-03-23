@@ -530,6 +530,46 @@ async def post_accept_offer(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+async def get_users(request: web.Request) -> web.Response:
+    """GET /api/users — список игроков вайтлиста."""
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Whitelist))
+        users = result.scalars().all()
+    return web.json_response([
+        {"user_id": u.user_id, "username": u.username or f"ID{u.user_id}"}
+        for u in users
+    ])
+
+
+async def get_opponent_squad(request: web.Request) -> web.Response:
+    """GET /api/opponent_squad?user_id=XXX — полный состав соперника с именами игроков."""
+    user_id_str = request.rel_url.query.get("user_id")
+    if not user_id_str:
+        return web.json_response({"error": "user_id required"}, status=400)
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        return web.json_response({"error": "invalid user_id"}, status=400)
+
+    async with AsyncSessionLocal() as session:
+        squad = await session.get(UserSquad, user_id)
+        if not squad:
+            return web.json_response({"formation": "4-4-2", "slots": []})
+
+        assignments = squad.slot_assignments  # {slot: user_card_id}
+        slots_out = []
+        for slot_name, card_id in assignments.items():
+            card = await session.get(UserCard, card_id)
+            if card:
+                slots_out.append({
+                    "slot": slot_name,
+                    "card_id": card_id,
+                    "player": _card_dict(card),
+                })
+
+    return web.json_response({"formation": squad.formation, "slots": slots_out})
+
+
 # ─── App factory ──────────────────────────────────────────────────────────────
 
 def create_api_app() -> web.Application:
@@ -557,6 +597,8 @@ def create_api_app() -> web.Application:
     app.router.add_options("/api/squad", lambda r: web.Response())
     app.router.add_get("/api/photo", proxy_photo)
     app.router.add_get("/api/lastpack", get_last_pack)
+    app.router.add_get("/api/users", get_users)
+    app.router.add_get("/api/opponent_squad", get_opponent_squad)
     app.router.add_get("/api/market", get_market)
     app.router.add_post("/api/market/list", post_list_card)
     app.router.add_post("/api/market/cancel", post_cancel_listing)
