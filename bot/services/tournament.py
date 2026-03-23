@@ -253,7 +253,7 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             for msg in all_messages:
                 try:
                     await bot.send_message(settings.group_id, msg)
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(4)
                 except Exception:
                     pass
         else:
