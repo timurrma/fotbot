@@ -88,6 +88,10 @@ async def commentate_half(
 
     raw = response.choices[0].message.content.strip()
 
+    # Убираем <think>...</think> теги (reasoning модели типо Qwen)
+    import re
+    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+
     # Парсим JSON-массив
     try:
         start = raw.find("[")
