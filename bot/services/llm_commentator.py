@@ -86,10 +86,12 @@ async def commentate_half(
         ],
     )
 
+    import logging
+    import re
     raw = response.choices[0].message.content.strip()
+    logging.getLogger(__name__).debug("LLM raw response: %r", raw[:500])
 
     # Убираем <think>...</think> теги (reasoning модели типо Qwen)
-    import re
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
 
     # Парсим JSON-массив
@@ -97,12 +99,27 @@ async def commentate_half(
         start = raw.find("[")
         end = raw.rfind("]") + 1
         if start != -1 and end > start:
-            return json.loads(raw[start:end])
+            parsed = json.loads(raw[start:end])
+            if isinstance(parsed, list) and parsed:
+                # Если LLM вернул список из одного элемента-строки который сам является JSON
+                if len(parsed) == 1 and isinstance(parsed[0], str) and parsed[0].strip().startswith("["):
+                    try:
+                        inner = json.loads(parsed[0])
+                        if isinstance(inner, list):
+                            parsed = inner
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+                result_msgs = [item.strip() for item in parsed if isinstance(item, str) and item.strip()]
+                if result_msgs:
+                    return result_msgs
     except (json.JSONDecodeError, ValueError):
         pass
 
-    # Фоллбэк — разбиваем по двойным переносам
-    return [msg.strip() for msg in raw.split("\n\n") if msg.strip()][:6]
+    # Фоллбэк — разбиваем по двойным переносам или одиночным
+    lines = [msg.strip() for msg in raw.split("\n\n") if msg.strip()]
+    if not lines:
+        lines = [msg.strip() for msg in raw.split("\n") if msg.strip()]
+    return lines[:6]
 
 
 async def commentate_match(
