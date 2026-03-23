@@ -20,6 +20,7 @@ async def get_top_scorers(
             Player.name,
             func.sum(MatchStat.goals).label("total_goals"),
             func.sum(MatchStat.assists).label("total_assists"),
+            func.count(MatchStat.match_id.distinct()).label("appearances"),
         )
         .join(Player, MatchStat.player_id == Player.id)
         .group_by(MatchStat.user_id, MatchStat.player_id, Player.name)
@@ -38,6 +39,7 @@ async def get_top_scorers(
             "player_name": row.name,
             "goals": row.total_goals,
             "assists": row.total_assists,
+            "appearances": row.appearances,
         }
         for row in result.all()
     ]
@@ -56,6 +58,7 @@ async def get_top_assisters(
             Player.name,
             func.sum(MatchStat.goals).label("total_goals"),
             func.sum(MatchStat.assists).label("total_assists"),
+            func.count(MatchStat.match_id.distinct()).label("appearances"),
         )
         .join(Player, MatchStat.player_id == Player.id)
         .group_by(MatchStat.user_id, MatchStat.player_id, Player.name)
@@ -74,6 +77,7 @@ async def get_top_assisters(
             "player_name": row.name,
             "goals": row.total_goals,
             "assists": row.total_assists,
+            "appearances": row.appearances,
         }
         for row in result.all()
     ]
@@ -91,6 +95,7 @@ async def get_user_stats(
             Player.name,
             func.sum(MatchStat.goals).label("total_goals"),
             func.sum(MatchStat.assists).label("total_assists"),
+            func.count(MatchStat.match_id.distinct()).label("appearances"),
         )
         .join(Player, MatchStat.player_id == Player.id)
         .where(MatchStat.user_id == user_id)
@@ -106,6 +111,7 @@ async def get_user_stats(
             "player_name": row.name,
             "goals": row.total_goals,
             "assists": row.total_assists,
+            "appearances": row.appearances,
         }
         for row in result.all()
     ]
@@ -140,7 +146,8 @@ async def get_tournament_record(
 def format_scorers(rows: list[dict], title: str) -> str:
     lines = [f"*{title}*\n"]
     for i, row in enumerate(rows, 1):
+        apps = row.get('appearances', 0)
         lines.append(
-            f"{i}. {row['player_name']} — ⚽{row['goals']} 🎯{row['assists']}"
+            f"{i}. {row['player_name']} — ⚽{row['goals']} 🎯{row['assists']} ({apps} матч.)"
         )
     return "\n".join(lines) if rows else f"{title}\nПока нет данных."

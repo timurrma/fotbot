@@ -91,7 +91,8 @@ def _format_with_owners(rows: list[dict], title: str, key: str, wl_map: dict) ->
         lines.append("Пока нет данных.")
     for i, r in enumerate(rows, 1):
         owner = wl_map.get(r['user_id'], f"ID{r['user_id']}")
-        lines.append(f"  {i}. {r['player_name']} (@{owner}) — {r[key]}")
+        apps = r.get('appearances', 0)
+        lines.append(f"  {i}. {r['player_name']} (@{owner}) — {r[key]} ({apps} матч.)")
     return "\n".join(lines)
 
 
