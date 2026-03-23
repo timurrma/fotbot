@@ -19,7 +19,7 @@ from aiohttp import web
 from sqlalchemy import select
 
 from bot.config import settings
-from bot.db.models import UserCard, UserSquad, PackHistory, Player
+from bot.db.models import UserCard, UserSquad, PackHistory, Player, TransferListing, TransferOffer, Whitelist
 from bot.db.session import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -219,6 +219,259 @@ async def get_last_pack(request: web.Request) -> web.Response:
     return web.json_response(players)
 
 
+def _card_dict(card: UserCard) -> dict:
+    p = card.player
+    return {
+        "card_id": card.id,
+        "player_id": p.id,
+        "name": p.name,
+        "club": p.club,
+        "position": p.position,
+        "rating": p.overall_rating,
+        "photo": p.photo_url,
+    }
+
+
+async def get_market(request: web.Request) -> web.Response:
+    """GET /api/market?user_id=XXX — все активные листинги кроме своих."""
+    user_id_str = request.rel_url.query.get("user_id")
+    user_id = int(user_id_str) if user_id_str else None
+
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(TransferListing).where(TransferListing.status == "active")
+        )
+        listings = result.scalars().all()
+
+        # Загружаем юзернеймы
+        wl_result = await session.execute(select(Whitelist))
+        wl_map = {w.user_id: w.username for w in wl_result.scalars().all()}
+
+    data = []
+    for l in listings:
+        data.append({
+            "listing_id": l.id,
+            "owner_id": l.user_id,
+            "owner": wl_map.get(l.user_id, f"ID{l.user_id}"),
+            "is_mine": l.user_id == user_id,
+            "card": _card_dict(l.card),
+            "created_at": l.created_at.isoformat(),
+        })
+    return web.json_response(data)
+
+
+async def post_list_card(request: web.Request) -> web.Response:
+    """POST /api/market/list — выставить карточку на рынок. {user_id, card_id}"""
+    body = await request.json()
+    user_id = int(body.get("user_id", 0))
+    card_id = int(body.get("card_id", 0))
+    if not user_id or not card_id:
+        return web.json_response({"error": "user_id and card_id required"}, status=400)
+
+    async with AsyncSessionLocal() as session:
+        card = await session.get(UserCard, card_id)
+        if not card or card.user_id != user_id:
+            return web.json_response({"error": "Карточка не найдена"}, status=400)
+
+        # Проверяем нет ли уже активного листинга этой карточки
+        existing = await session.execute(
+            select(TransferListing).where(
+                TransferListing.card_id == card_id,
+                TransferListing.status == "active",
+            )
+        )
+        if existing.scalar_one_or_none():
+            return web.json_response({"error": "Карточка уже на рынке"}, status=400)
+
+        listing = TransferListing(user_id=user_id, card_id=card_id, status="active")
+        session.add(listing)
+        await session.commit()
+        await session.refresh(listing)
+
+    return web.json_response({"ok": True, "listing_id": listing.id})
+
+
+async def post_cancel_listing(request: web.Request) -> web.Response:
+    """POST /api/market/cancel — снять карточку с рынка. {user_id, listing_id}"""
+    body = await request.json()
+    user_id = int(body.get("user_id", 0))
+    listing_id = int(body.get("listing_id", 0))
+
+    async with AsyncSessionLocal() as session:
+        listing = await session.get(TransferListing, listing_id)
+        if not listing or listing.user_id != user_id:
+            return web.json_response({"error": "Листинг не найден"}, status=400)
+        if listing.status != "active":
+            return web.json_response({"error": "Листинг уже неактивен"}, status=400)
+
+        # Отменяем все pending офферы на этот листинг
+        offers = await session.execute(
+            select(TransferOffer).where(
+                TransferOffer.want_card_id == listing.card_id,
+                TransferOffer.to_user_id == user_id,
+                TransferOffer.status == "pending",
+            )
+        )
+        for offer in offers.scalars().all():
+            offer.status = "cancelled"
+
+        listing.status = "cancelled"
+        await session.commit()
+
+    return web.json_response({"ok": True})
+
+
+async def post_make_offer(request: web.Request) -> web.Response:
+    """POST /api/market/offer — предложить свою карточку в обмен. {user_id, listing_id, offer_card_id}"""
+    body = await request.json()
+    user_id = int(body.get("user_id", 0))
+    listing_id = int(body.get("listing_id", 0))
+    offer_card_id = int(body.get("offer_card_id", 0))
+
+    async with AsyncSessionLocal() as session:
+        listing = await session.get(TransferListing, listing_id)
+        if not listing or listing.status != "active":
+            return web.json_response({"error": "Листинг не найден или неактивен"}, status=400)
+        if listing.user_id == user_id:
+            return web.json_response({"error": "Нельзя делать оффер на свой листинг"}, status=400)
+
+        offer_card = await session.get(UserCard, offer_card_id)
+        if not offer_card or offer_card.user_id != user_id:
+            return web.json_response({"error": "Карточка не найдена в твоей коллекции"}, status=400)
+
+        # Проверяем нет ли уже оффера от этого пользователя на этот листинг
+        existing = await session.execute(
+            select(TransferOffer).where(
+                TransferOffer.from_user_id == user_id,
+                TransferOffer.want_card_id == listing.card_id,
+                TransferOffer.status == "pending",
+            )
+        )
+        if existing.scalar_one_or_none():
+            return web.json_response({"error": "Ты уже сделал оффер на эту карточку"}, status=400)
+
+        from bot.services.transfers import get_remaining_transfers
+        remaining = await get_remaining_transfers(session, user_id)
+        if remaining <= 0:
+            return web.json_response({"error": "Лимит трансферов на неделю исчерпан (3)"}, status=400)
+
+        offer = TransferOffer(
+            from_user_id=user_id,
+            to_user_id=listing.user_id,
+            offer_card_id=offer_card_id,
+            want_card_id=listing.card_id,
+            status="pending",
+        )
+        session.add(offer)
+        await session.commit()
+        await session.refresh(offer)
+
+    return web.json_response({"ok": True, "offer_id": offer.id})
+
+
+async def post_cancel_offer(request: web.Request) -> web.Response:
+    """POST /api/market/cancel-offer — отменить свой оффер. {user_id, offer_id}"""
+    body = await request.json()
+    user_id = int(body.get("user_id", 0))
+    offer_id = int(body.get("offer_id", 0))
+
+    async with AsyncSessionLocal() as session:
+        offer = await session.get(TransferOffer, offer_id)
+        if not offer or offer.from_user_id != user_id:
+            return web.json_response({"error": "Оффер не найден"}, status=400)
+        if offer.status != "pending":
+            return web.json_response({"error": "Оффер уже неактивен"}, status=400)
+        offer.status = "cancelled"
+        await session.commit()
+
+    return web.json_response({"ok": True})
+
+
+async def get_listing_offers(request: web.Request) -> web.Response:
+    """GET /api/market/offers?user_id=XXX — офферы на мои листинги."""
+    user_id_str = request.rel_url.query.get("user_id")
+    user_id = int(user_id_str) if user_id_str else None
+    if not user_id:
+        return web.json_response({"error": "user_id required"}, status=400)
+
+    async with AsyncSessionLocal() as session:
+        # Мои активные листинги
+        listings_result = await session.execute(
+            select(TransferListing).where(
+                TransferListing.user_id == user_id,
+                TransferListing.status == "active",
+            )
+        )
+        listings = {l.card_id: l for l in listings_result.scalars().all()}
+
+        if not listings:
+            return web.json_response([])
+
+        # Офферы на мои карточки
+        offers_result = await session.execute(
+            select(TransferOffer).where(
+                TransferOffer.to_user_id == user_id,
+                TransferOffer.want_card_id.in_(list(listings.keys())),
+                TransferOffer.status == "pending",
+            )
+        )
+        offers = offers_result.scalars().all()
+
+        wl_result = await session.execute(select(Whitelist))
+        wl_map = {w.user_id: w.username for w in wl_result.scalars().all()}
+
+    data = []
+    for o in offers:
+        listing = listings.get(o.want_card_id)
+        data.append({
+            "offer_id": o.id,
+            "listing_id": listing.id if listing else None,
+            "from_user": wl_map.get(o.from_user_id, f"ID{o.from_user_id}"),
+            "offer_card": _card_dict(o.offer_card),
+            "want_card": _card_dict(o.want_card),
+        })
+    return web.json_response(data)
+
+
+async def post_accept_offer(request: web.Request) -> web.Response:
+    """POST /api/market/accept — принять оффер. {user_id, offer_id}"""
+    body = await request.json()
+    user_id = int(body.get("user_id", 0))
+    offer_id = int(body.get("offer_id", 0))
+
+    from bot.services.transfers import accept_transfer
+    async with AsyncSessionLocal() as session:
+        ok, msg = await accept_transfer(session, offer_id, user_id)
+        if not ok:
+            return web.json_response({"error": msg}, status=400)
+
+        # Помечаем листинг как taken
+        offer = await session.get(TransferOffer, offer_id)
+        if offer:
+            listing_result = await session.execute(
+                select(TransferListing).where(
+                    TransferListing.card_id == offer.want_card_id,
+                    TransferListing.status == "active",
+                )
+            )
+            listing = listing_result.scalar_one_or_none()
+            if listing:
+                listing.status = "taken"
+            # Отменяем остальные офферы на этот листинг
+            other_offers = await session.execute(
+                select(TransferOffer).where(
+                    TransferOffer.want_card_id == offer.want_card_id,
+                    TransferOffer.status == "pending",
+                    TransferOffer.id != offer_id,
+                )
+            )
+            for o in other_offers.scalars().all():
+                o.status = "cancelled"
+            await session.commit()
+
+    return web.json_response({"ok": True})
+
+
 # ─── App factory ──────────────────────────────────────────────────────────────
 
 def create_api_app() -> web.Application:
@@ -246,6 +499,16 @@ def create_api_app() -> web.Application:
     app.router.add_options("/api/squad", lambda r: web.Response())
     app.router.add_get("/api/photo", proxy_photo)
     app.router.add_get("/api/lastpack", get_last_pack)
+    app.router.add_get("/api/market", get_market)
+    app.router.add_post("/api/market/list", post_list_card)
+    app.router.add_post("/api/market/cancel", post_cancel_listing)
+    app.router.add_post("/api/market/offer", post_make_offer)
+    app.router.add_post("/api/market/cancel-offer", post_cancel_offer)
+    app.router.add_get("/api/market/offers", get_listing_offers)
+    app.router.add_post("/api/market/accept", post_accept_offer)
+    for path in ["/api/market/list", "/api/market/cancel", "/api/market/offer",
+                 "/api/market/cancel-offer", "/api/market/accept"]:
+        app.router.add_options(path, lambda r: web.Response())
 
     # Раздаём Mini App (index.html) по корневому пути
     import os

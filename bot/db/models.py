@@ -182,6 +182,19 @@ class TransferOffer(Base):
     )
 
 
+class TransferListing(Base):
+    """Карточка выставленная на трансферный рынок."""
+    __tablename__ = "transfer_listings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    card_id: Mapped[int] = mapped_column(Integer, ForeignKey("user_cards.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active / cancelled / taken
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+    card: Mapped["UserCard"] = relationship("UserCard", lazy="joined")
+
+
 class TransferCount(Base):
     """Счётчик трансферов за текущую неделю."""
     __tablename__ = "transfer_counts"

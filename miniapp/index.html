@@ -361,6 +361,63 @@
     transform: translateX(-50%) translateY(0);
   }
 
+  /* ─── Tab nav ─── */
+  .tab-nav {
+    display: flex;
+    background: var(--card-bg);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    position: sticky;
+    top: 53px;
+    z-index: 99;
+  }
+  .tab-nav button {
+    flex: 1;
+    padding: 10px 4px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-nav button.active {
+    color: var(--green-light);
+    border-bottom-color: var(--green-light);
+  }
+
+  /* ─── Transfer market ─── */
+  .market-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 0 12px 8px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .market-card .mc-info { flex: 1; min-width: 0; }
+  .market-card .mc-owner { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+  .market-card .mc-name { font-size: 14px; font-weight: 700; }
+  .market-card .mc-meta { font-size: 12px; color: var(--text-muted); }
+  .market-card .mc-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  .mc-btn {
+    border: none; border-radius: 8px; padding: 6px 12px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .mc-btn.green { background: var(--green-light); color: #0d1117; }
+  .mc-btn.red { background: #ef4444; color: white; }
+  .mc-btn.gray { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+  .offer-badge {
+    background: var(--gold);
+    color: #0d1117;
+    border-radius: 10px;
+    padding: 2px 7px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
   /* ─── Loading ─── */
   .loading {
     display: flex;
@@ -385,29 +442,49 @@
 <body>
 
 <div class="header">
-  <h1>⚽ Состав команды</h1>
-  <button class="save-btn" style="background:transparent;color:var(--text-muted);font-size:20px;padding:4px 10px;" onclick="reloadData()" title="Обновить">🔄</button>
+  <h1 id="pageTitle">⚽ Состав</h1>
+  <button class="save-btn" style="background:transparent;color:var(--text-muted);font-size:20px;padding:4px 10px;" onclick="reloadAll()" title="Обновить">🔄</button>
   <button class="save-btn" id="saveBtn" onclick="saveSquad()">Сохранить</button>
 </div>
 
-<!-- Formation tabs -->
-<div class="formation-row" id="formationRow"></div>
+<!-- Tab nav -->
+<div class="tab-nav">
+  <button id="tab-squad" class="active" onclick="switchTab('squad')">⚽ Состав</button>
+  <button id="tab-transfers" onclick="switchTab('transfers')">🔄 Трансферы</button>
+</div>
 
-<!-- Pitch -->
-<div class="pitch-container">
-  <div class="pitch" id="pitch">
-    <div class="loading"><div class="spinner"></div> Загрузка...</div>
+<!-- ── SQUAD TAB ── -->
+<div id="page-squad">
+  <!-- Formation tabs -->
+  <div class="formation-row" id="formationRow"></div>
+
+  <!-- Pitch -->
+  <div class="pitch-container">
+    <div class="pitch" id="pitch">
+      <div class="loading"><div class="spinner"></div> Загрузка...</div>
+    </div>
+  </div>
+
+  <!-- Hint -->
+  <div class="hint" id="hint">Выбери слот на поле, затем выбери игрока из списка</div>
+
+  <!-- Player list -->
+  <div class="section-title">Коллекция</div>
+  <div class="filter-row" id="filterRow"></div>
+  <div class="player-list" id="playerList">
+    <div class="loading"><div class="spinner"></div> Загрузка карточек...</div>
   </div>
 </div>
 
-<!-- Hint -->
-<div class="hint" id="hint">Выбери слот на поле, затем выбери игрока из списка</div>
+<!-- ── TRANSFERS TAB ── -->
+<div id="page-transfers" style="display:none; padding-bottom: 40px;">
+  <!-- Мои офферы входящие -->
+  <div class="section-title" id="incomingTitle" style="display:none">📨 Предложения мне</div>
+  <div id="incomingOffers"></div>
 
-<!-- Player list -->
-<div class="section-title">Коллекция</div>
-<div class="filter-row" id="filterRow"></div>
-<div class="player-list" id="playerList">
-  <div class="loading"><div class="spinner"></div> Загрузка карточек...</div>
+  <!-- Рынок -->
+  <div class="section-title">🏪 Трансферный рынок</div>
+  <div id="marketList"><div class="loading"><div class="spinner"></div></div></div>
 </div>
 
 <!-- Toast -->
@@ -501,6 +578,7 @@ let posFilter = 'ALL';
 let pageSize = 20;
 let visibleCount = pageSize;
 let lastPackIds = new Set(); // card ids from last pack
+let selectedCard = null;  // выбранная карточка (новый флоу: карточка → слот)
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
@@ -724,14 +802,26 @@ function shortName(name) {
 }
 
 function selectSlot(slotName) {
+  // Если уже выбрана карточка — назначаем её на этот слот
+  if (selectedCard) {
+    _assignCardToSlot(selectedCard, slotName);
+    selectedCard = null;
+    selectedSlot = null;
+    setHint(false);
+    renderPitch();
+    renderPlayerList();
+    return;
+  }
+
   if (selectedSlot === slotName) {
-    // Deselect → clear this slot
+    // Повторный клик на тот же слот — снимаем игрока
     delete squad[slotName];
     selectedSlot = null;
     setHint(false);
     posFilter = 'ALL';
   } else {
     selectedSlot = slotName;
+    selectedCard = null;
     setHint(true);
     // Автофильтр по позиции слота
     const slotPos = SLOT_POSITION[slotName];
@@ -787,7 +877,7 @@ function renderPlayerList() {
   const visible = filtered.slice(0, visibleCount);
   for (const card of visible) {
     const inSquad = assignedCardIds.has(card.id) && squad[selectedSlot] !== card.id;
-    const isSelected = selectedSlot && squad[selectedSlot] === card.id;
+    const isSelected = (selectedSlot && squad[selectedSlot] === card.id) || (selectedCard && selectedCard.id === card.id);
     list.appendChild(makeCardEl(card, inSquad, isSelected));
   }
 
@@ -846,41 +936,59 @@ function ratingClass(r) {
   return 'rating-bronze';
 }
 
-function assignCard(card) {
-  if (!selectedSlot) {
-    // No slot selected: just highlight card to hint
-    showToast('Сначала выбери слот на поле');
-    return;
-  }
-
+function _assignCardToSlot(card, slotName) {
   // Block GK ↔ outfield swap
-  const slotPos = SLOT_POSITION[selectedSlot];
+  const slotPos = SLOT_POSITION[slotName];
   const playerPositions = card.positions || [card.position];
   const isPlayerGK = playerPositions.includes('GK');
   const isSlotGK = slotPos === 'GK';
   if (isPlayerGK && !isSlotGK) {
     showToast('❌ Вратаря нельзя ставить на полевую позицию');
-    return;
+    return false;
   }
   if (!isPlayerGK && isSlotGK) {
     showToast('❌ Полевого нельзя ставить в ворота');
-    return;
+    return false;
   }
-
-  // Remove this card from any other slot
+  // Убираем карточку с других слотов
   for (const [s, cid] of Object.entries(squad)) {
     if (cid === card.id) delete squad[s];
   }
-
-  if (squad[selectedSlot] === card.id) {
-    // Tap same card → unassign
-    delete squad[selectedSlot];
+  if (squad[slotName] === card.id) {
+    delete squad[slotName];
   } else {
-    squad[selectedSlot] = card.id;
+    squad[slotName] = card.id;
+  }
+  return true;
+}
+
+function assignCard(card) {
+  if (selectedSlot) {
+    // Флоу 1: слот уже выбран → назначаем карточку
+    _assignCardToSlot(card, selectedSlot);
+    selectedSlot = null;
+    selectedCard = null;
+    setHint(false);
+    posFilter = 'ALL';
+    renderPitch();
+    renderFilterRow();
+    renderPlayerList();
+    return;
   }
 
+  if (selectedCard && selectedCard.id === card.id) {
+    // Повторный клик на ту же карточку — снимаем выбор
+    selectedCard = null;
+    setHint(false);
+    renderPlayerList();
+    return;
+  }
+
+  // Флоу 2: карточка выбрана первой → подсвечиваем, ждём клика по слоту
+  selectedCard = card;
   selectedSlot = null;
-  setHint(false);
+  setHint(true);
+  document.getElementById('hint').textContent = `Выбран: ${card.name} — выбери слот на поле`;
   renderPitch();
   renderPlayerList();
 }
@@ -896,6 +1004,243 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+let currentTab = 'squad';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('page-squad').style.display = tab === 'squad' ? '' : 'none';
+  document.getElementById('page-transfers').style.display = tab === 'transfers' ? '' : 'none';
+  document.getElementById('saveBtn').style.display = tab === 'squad' ? '' : 'none';
+  document.getElementById('tab-squad').classList.toggle('active', tab === 'squad');
+  document.getElementById('tab-transfers').classList.toggle('active', tab === 'transfers');
+  if (tab === 'transfers') loadMarket();
+}
+
+function reloadAll() {
+  if (currentTab === 'squad') reloadData();
+  else loadMarket();
+}
+
+// ─── Transfer market ──────────────────────────────────────────────────────────
+let market = [];
+let myOffers = []; // офферы которые я сделал (от меня)
+
+async function loadMarket() {
+  document.getElementById('marketList').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const [mktR, offR] = await Promise.all([
+      fetch(`${API_BASE}/api/market?user_id=${userId}`, { cache: 'no-store' }),
+      fetch(`${API_BASE}/api/market/offers?user_id=${userId}`, { cache: 'no-store' }),
+    ]);
+    market = await mktR.json();
+    const incomingOffers = await offR.json();
+    renderMarket(incomingOffers);
+  } catch(e) {
+    document.getElementById('marketList').innerHTML = '<div style="text-align:center;color:#64748b;padding:20px">Ошибка загрузки</div>';
+  }
+}
+
+function renderMarket(incomingOffers) {
+  // Входящие офферы
+  const incEl = document.getElementById('incomingOffers');
+  const incTitle = document.getElementById('incomingTitle');
+  incEl.innerHTML = '';
+  if (incomingOffers && incomingOffers.length > 0) {
+    incTitle.style.display = '';
+    for (const o of incomingOffers) {
+      const el = document.createElement('div');
+      el.className = 'market-card';
+      el.innerHTML = `
+        <div class="mc-info">
+          <div class="mc-owner">От @${o.from_user}</div>
+          <div class="mc-name">Предлагает: ${o.offer_card.name}</div>
+          <div class="mc-meta">${o.offer_card.position} · ${o.offer_card.rating} ⭐</div>
+          <div class="mc-meta" style="margin-top:4px">За твоего: ${o.want_card.name} (${o.want_card.rating})</div>
+        </div>
+        <div class="mc-actions">
+          <button class="mc-btn green" onclick="acceptOffer(${o.offer_id})">✅ Принять</button>
+          <button class="mc-btn gray" onclick="declineOffer(${o.offer_id})">❌</button>
+        </div>`;
+      incEl.appendChild(el);
+    }
+  } else {
+    incTitle.style.display = 'none';
+  }
+
+  // Рынок
+  const list = document.getElementById('marketList');
+  list.innerHTML = '';
+
+  if (!market || market.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:#64748b;padding:20px;font-size:13px;">Рынок пуст. Выставь карточку!</div>';
+  } else {
+    for (const item of market) {
+      const el = document.createElement('div');
+      el.className = 'market-card';
+      const star = item.card.rating >= 90 ? '👑' : item.card.rating >= 85 ? '🌟' : '⭐';
+      const photo = item.card.photo ? `<img src="${API_BASE}/api/photo?url=${encodeURIComponent(item.card.photo)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'" loading="lazy">` : `<div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:20px;">👤</div>`;
+
+      if (item.is_mine) {
+        el.innerHTML = `
+          ${photo}
+          <div class="mc-info">
+            <div class="mc-owner">Мой листинг</div>
+            <div class="mc-name">${item.card.name}</div>
+            <div class="mc-meta">${item.card.position} · ${item.card.rating} ${star}</div>
+          </div>
+          <div class="mc-actions">
+            <button class="mc-btn red" onclick="cancelListing(${item.listing_id})">Снять</button>
+          </div>`;
+      } else {
+        el.innerHTML = `
+          ${photo}
+          <div class="mc-info">
+            <div class="mc-owner">@${item.owner}</div>
+            <div class="mc-name">${item.card.name}</div>
+            <div class="mc-meta">${item.card.position} · ${item.card.rating} ${star}</div>
+          </div>
+          <div class="mc-actions">
+            <button class="mc-btn green" onclick="openOfferModal(${item.listing_id}, ${item.card.card_id}, '${item.card.name}')">Предложить</button>
+          </div>`;
+      }
+      list.appendChild(el);
+    }
+  }
+
+  // Кнопка "Выставить карточку"
+  const addBtn = document.createElement('button');
+  addBtn.style.cssText = 'width:calc(100% - 24px);margin:12px;padding:14px;background:rgba(82,183,136,0.15);border:1px dashed rgba(82,183,136,0.4);border-radius:12px;color:var(--green-light);font-size:14px;font-weight:700;cursor:pointer;';
+  addBtn.textContent = '+ Выставить карточку на обмен';
+  addBtn.onclick = openListModal;
+  list.appendChild(addBtn);
+}
+
+// ─── Modals ───────────────────────────────────────────────────────────────────
+function openListModal() {
+  // Показываем коллекцию текущего пользователя для выбора
+  const modal = createModal('Выбери карточку для выставления');
+  const sortedCards = [...cards].sort((a,b) => b.rating - a.rating);
+  for (const c of sortedCards) {
+    const star = c.rating >= 90 ? '👑' : c.rating >= 85 ? '🌟' : '⭐';
+    const row = document.createElement('div');
+    row.className = 'player-card';
+    row.style.margin = '0 0 6px';
+    row.innerHTML = `<div class="player-info"><div class="player-name">${c.name}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
+    row.onclick = async () => {
+      closeModal();
+      await listCard(c.id);
+    };
+    modal.body.appendChild(row);
+  }
+}
+
+function openOfferModal(listingId, wantCardId, wantCardName) {
+  const modal = createModal(`Предложить в обмен за ${wantCardName}`);
+  const sortedCards = [...cards].sort((a,b) => b.rating - a.rating);
+  for (const c of sortedCards) {
+    const star = c.rating >= 90 ? '👑' : c.rating >= 85 ? '🌟' : '⭐';
+    const row = document.createElement('div');
+    row.className = 'player-card';
+    row.style.margin = '0 0 6px';
+    row.innerHTML = `<div class="player-info"><div class="player-name">${c.name}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
+    row.onclick = async () => {
+      closeModal();
+      await makeOffer(listingId, c.id);
+    };
+    modal.body.appendChild(row);
+  }
+}
+
+function createModal(title) {
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;display:flex;align-items:flex-end;';
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:#1e293b;border-radius:20px 20px 0 0;width:100%;max-height:80vh;overflow-y:auto;padding:16px;';
+  const h = document.createElement('div');
+  h.style.cssText = 'font-size:15px;font-weight:700;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;';
+  h.innerHTML = `<span>${title}</span><button onclick="closeModal()" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>`;
+  sheet.appendChild(h);
+  const body = document.createElement('div');
+  sheet.appendChild(body);
+  overlay.appendChild(sheet);
+  overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+  document.body.appendChild(overlay);
+  return { overlay, body };
+}
+
+function closeModal() {
+  const el = document.getElementById('modal-overlay');
+  if (el) el.remove();
+}
+
+// ─── Market actions ───────────────────────────────────────────────────────────
+async function listCard(cardId) {
+  try {
+    const r = await fetch(`${API_BASE}/api/market/list`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ user_id: userId, card_id: cardId }),
+    });
+    const data = await r.json();
+    if (data.error) { showToast('❌ ' + data.error); return; }
+    showToast('✅ Карточка выставлена на рынок');
+    loadMarket();
+  } catch(e) { showToast('❌ Ошибка'); }
+}
+
+async function cancelListing(listingId) {
+  try {
+    const r = await fetch(`${API_BASE}/api/market/cancel`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ user_id: userId, listing_id: listingId }),
+    });
+    const data = await r.json();
+    if (data.error) { showToast('❌ ' + data.error); return; }
+    showToast('✅ Карточка снята с рынка');
+    loadMarket();
+  } catch(e) { showToast('❌ Ошибка'); }
+}
+
+async function makeOffer(listingId, offerCardId) {
+  try {
+    const r = await fetch(`${API_BASE}/api/market/offer`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ user_id: userId, listing_id: listingId, offer_card_id: offerCardId }),
+    });
+    const data = await r.json();
+    if (data.error) { showToast('❌ ' + data.error); return; }
+    showToast('✅ Предложение отправлено');
+    loadMarket();
+  } catch(e) { showToast('❌ Ошибка'); }
+}
+
+async function acceptOffer(offerId) {
+  try {
+    const r = await fetch(`${API_BASE}/api/market/accept`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ user_id: userId, offer_id: offerId }),
+    });
+    const data = await r.json();
+    if (data.error) { showToast('❌ ' + data.error); return; }
+    showToast('✅ Обмен выполнен!');
+    await Promise.all([loadCards(), loadMarket()]);
+  } catch(e) { showToast('❌ Ошибка'); }
+}
+
+async function declineOffer(offerId) {
+  try {
+    const r = await fetch(`${API_BASE}/api/market/cancel-offer`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ user_id: userId, offer_id: offerId }),
+    });
+    const data = await r.json();
+    if (data.error) { showToast('❌ ' + data.error); return; }
+    showToast('Предложение отклонено');
+    loadMarket();
+  } catch(e) { showToast('❌ Ошибка'); }
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────
