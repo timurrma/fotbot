@@ -55,6 +55,36 @@ async def cmd_topweek(message: Message) -> None:
     await message.reply(text, parse_mode="Markdown")
 
 
+@router.message(Command("schedule"))
+async def cmd_schedule(message: Message) -> None:
+    """Расписание событий недели."""
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone(timedelta(hours=3)))  # Moscow time
+    weekday = now.weekday()  # 0=пн, 2=ср, 3=чт
+
+    # Ближайшая среда и четверг
+    days_to_wed = (2 - weekday) % 7
+    days_to_thu = (3 - weekday) % 7
+
+    wed = now + timedelta(days=days_to_wed)
+    thu = now + timedelta(days=days_to_thu)
+
+    wed_str = wed.strftime("%d.%m")
+    thu_str = thu.strftime("%d.%m")
+
+    await message.reply(
+        "📅 <b>Расписание недели</b>\n\n"
+        f"⚽ <b>Среда {wed_str}, 20:00</b> — анонс турнира\n"
+        f"🎮 <b>Среда {wed_str}, 20:00–21:00</b> — настройка состава\n"
+        f"🏟 <b>Среда {wed_str}, 21:00+</b> — запуск матчей (/nextmatch)\n\n"
+        f"📊 <b>Четверг {thu_str}, 09:00</b> — авто-итоги несыгранных матчей\n"
+        f"🎴 <b>Четверг {thu_str}, 10:00</b> — раздача еженедельных паков\n\n"
+        "Время московское 🕐",
+        parse_mode="HTML",
+    )
+
+
 @router.message(Command("myteam"))
 async def cmd_myteam(message: Message) -> None:
     """Показать текущий состав."""
