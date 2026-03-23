@@ -85,27 +85,45 @@ async def cmd_alltime(message: Message) -> None:
     await message.reply(text, parse_mode="HTML")
 
 
+def _format_with_owners(rows: list[dict], title: str, key: str, wl_map: dict) -> str:
+    lines = [f"<b>{title}</b>\n"]
+    if not rows:
+        lines.append("Пока нет данных.")
+    for i, r in enumerate(rows, 1):
+        owner = wl_map.get(r['user_id'], f"ID{r['user_id']}")
+        lines.append(f"  {i}. {r['player_name']} (@{owner}) — {r[key]}")
+    return "\n".join(lines)
+
+
 @router.message(Command("top"))
 async def cmd_top(message: Message) -> None:
     """Лучшие бомбардиры и ассистенты за всё время."""
+    from sqlalchemy import select as wl_select
+    from bot.db.models import Whitelist
     async with AsyncSessionLocal() as session:
         scorers = await get_top_scorers(session, limit=10)
         assisters = await get_top_assisters(session, limit=10)
-    text = format_scorers(scorers, "⚽ Бомбардиры всех времён")
-    text += "\n\n" + format_scorers(assisters, "🎯 Ассистенты всех времён")
-    await message.reply(text, parse_mode="Markdown")
+        wl_result = await session.execute(wl_select(Whitelist))
+        wl_map = {w.user_id: (w.username or f"ID{w.user_id}") for w in wl_result.scalars().all()}
+    text = _format_with_owners(scorers, "⚽ Бомбардиры всех времён", "goals", wl_map)
+    text += "\n\n" + _format_with_owners(assisters, "🎯 Ассистенты всех времён", "assists", wl_map)
+    await message.reply(text, parse_mode="HTML")
 
 
 @router.message(Command("topweek"))
 async def cmd_topweek(message: Message) -> None:
     """Лучшие бомбардиры и ассистенты текущего турнира."""
+    from sqlalchemy import select as wl_select
+    from bot.db.models import Whitelist
     async with AsyncSessionLocal() as session:
         tournament = await get_or_create_tournament(session)
         scorers = await get_top_scorers(session, limit=10, tournament_id=tournament.id)
         assisters = await get_top_assisters(session, limit=10, tournament_id=tournament.id)
-    text = format_scorers(scorers, "⚽ Бомбардиры этой недели")
-    text += "\n\n" + format_scorers(assisters, "🎯 Ассистенты этой недели")
-    await message.reply(text, parse_mode="Markdown")
+        wl_result = await session.execute(wl_select(Whitelist))
+        wl_map = {w.user_id: (w.username or f"ID{w.user_id}") for w in wl_result.scalars().all()}
+    text = _format_with_owners(scorers, "⚽ Бомбардиры этой недели", "goals", wl_map)
+    text += "\n\n" + _format_with_owners(assisters, "🎯 Ассистенты этой недели", "assists", wl_map)
+    await message.reply(text, parse_mode="HTML")
 
 
 @router.message(Command("schedule"))
