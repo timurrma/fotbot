@@ -190,17 +190,33 @@ async def _open_russia_pack(
     session: AsyncSession,
     used_ids: set[int],
 ) -> list[Player]:
-    """Россия-пак: 1 случайный игрок сборной России."""
+    """Россия-пак: 1 игрок сборной России с взвешенной вероятностью по диапазонам."""
+    # Диапазоны: 65-74 (55%), 75-78 (35%), 79+ (10%)
+    ranges = [(65, 74), (75, 78), (79, 99)]
+    weights = [55, 35, 10]
+    r_min, r_max = random.choices(ranges, weights=weights, k=1)[0]
+
     query = select(Player).where(
         Player.nationality == "Russia",
-        Player.id.notin_(used_ids) if used_ids else True,
+        Player.overall_rating >= r_min,
+        Player.overall_rating <= r_max,
     )
+    if used_ids:
+        query = query.where(Player.id.notin_(used_ids))
     result = await session.execute(query)
-    russian_players = result.scalars().all()
-    if not russian_players:
+    players = result.scalars().all()
+
+    if not players:
+        # Фоллбэк — любой русский
+        query2 = select(Player).where(Player.nationality == "Russia")
+        if used_ids:
+            query2 = query2.where(Player.id.notin_(used_ids))
+        result2 = await session.execute(query2)
+        players = result2.scalars().all()
+
+    if not players:
         return []
-    player = random.choice(russian_players)
-    return [player]
+    return [random.choice(players)]
 
 
 async def give_pending_pack(session: AsyncSession, user_id: int, pack_type: str = "weekly") -> None:
