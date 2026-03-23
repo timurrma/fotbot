@@ -403,10 +403,6 @@
 <!-- Hint -->
 <div class="hint" id="hint">Выбери слот на поле, затем выбери игрока из списка</div>
 
-<!-- Last pack -->
-<div class="section-title" id="lastPackTitle" style="display:none">Последний пак</div>
-<div class="player-list" id="lastPackList"></div>
-
 <!-- Player list -->
 <div class="section-title">Коллекция</div>
 <div class="filter-row" id="filterRow"></div>
@@ -504,6 +500,7 @@ let selectedSlot = null; // slot name user clicked
 let posFilter = 'ALL';
 let pageSize = 20;
 let visibleCount = pageSize;
+let lastPackIds = new Set(); // card ids from last pack
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function init() {
@@ -522,6 +519,10 @@ async function init() {
 
   renderFormationTabs();
   await Promise.all([loadCards(), loadSquad(), loadLastPack()]);
+  // Матчим player_id пака с card_id коллекции
+  if (window._lastPackPlayerIds) {
+    lastPackIds = new Set(cards.filter(c => window._lastPackPlayerIds.has(c.player_id)).map(c => c.id));
+  }
   renderPitch();
   renderPlayerList();
   renderFilterRow();
@@ -551,36 +552,12 @@ async function loadLastPack() {
     const r = await fetch(`${API_BASE}/api/lastpack?user_id=${userId}`, { cache: 'no-store' });
     const players = await r.json();
     if (!Array.isArray(players) || players.length === 0) return;
-    document.getElementById('lastPackTitle').style.display = '';
-    const list = document.getElementById('lastPackList');
-    list.innerHTML = '';
-    const packType = players[0].pack_type;
-    const typeLabel = packType === 'starter' ? '🌟 Стартовый' : packType === 'special' ? '💎 Специальный' : '🎴 Еженедельный';
-    const date = new Date(players[0].opened_at).toLocaleDateString('ru', {day:'numeric', month:'short'});
-    const meta = document.createElement('div');
-    meta.style.cssText = 'font-size:12px;color:#94a3b8;padding:0 16px 8px;';
-    meta.textContent = `${typeLabel} · ${date}`;
-    list.appendChild(meta);
-    for (const p of players) {
-      const el = document.createElement('div');
-      el.className = 'player-card';
-      const ratingClass = p.rating >= 90 ? 'gold' : p.rating >= 85 ? 'silver' : '';
-      const star = p.rating >= 90 ? '👑' : p.rating >= 85 ? '🌟' : '⭐';
-      el.innerHTML = `
-        <div class="player-avatar">
-          ${p.photo
-            ? `<img src="${API_BASE}/api/photo?url=${encodeURIComponent(p.photo)}" onerror="this.style.display='none'" loading="lazy">`
-            : `<span style="font-size:20px">👤</span>`}
-        </div>
-        <div class="player-info">
-          <div class="player-name">${p.name}</div>
-          <div class="player-meta">${p.position} · ${p.club || '—'}</div>
-        </div>
-        <div class="player-rating ${ratingClass}">${p.rating} ${star}</div>`;
-      list.appendChild(el);
-    }
+    // Сохраняем player_id из пака, матчим с карточками коллекции по player_id
+    const packPlayerIds = new Set(players.map(p => p.id));
+    // Будем матчить после загрузки карточек — используем player_id
+    window._lastPackPlayerIds = packPlayerIds;
   } catch(e) {
-    // Тихо — пак не критичен
+    // Тихо
   }
 }
 
@@ -772,6 +749,14 @@ const POSITIONS = ['ALL', 'GK', 'CB', 'LB', 'RB', 'CDM', 'CM', 'LM', 'RM', 'CAM'
 function renderFilterRow() {
   const row = document.getElementById('filterRow');
   row.innerHTML = '';
+  // Кнопка последнего пака (если есть)
+  if (lastPackIds.size > 0) {
+    const btn = document.createElement('button');
+    btn.className = 'pos-filter' + (posFilter === 'PACK' ? ' active' : '');
+    btn.textContent = '🎴 Пак';
+    btn.onclick = () => { posFilter = 'PACK'; visibleCount = pageSize; renderFilterRow(); renderPlayerList(); };
+    row.appendChild(btn);
+  }
   for (const pos of POSITIONS) {
     const btn = document.createElement('button');
     btn.className = 'pos-filter' + (pos === posFilter ? ' active' : '');
@@ -788,7 +773,9 @@ function renderPlayerList() {
   const assignedCardIds = new Set(Object.values(squad));
   let filtered = cards;
 
-  if (posFilter !== 'ALL') {
+  if (posFilter === 'PACK') {
+    filtered = cards.filter(c => lastPackIds.has(c.id));
+  } else if (posFilter !== 'ALL') {
     filtered = cards.filter(c => c.position === posFilter || (c.positions || []).includes(posFilter));
   }
 
