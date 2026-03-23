@@ -142,12 +142,19 @@ def expected_goals(home_str: float, away_str: float) -> tuple[float, float]:
     """
     Вычисляет ожидаемые голы (λ) для Пуассона.
     Разница в силе сдвигает λ, но не более ±2.5.
+    10% шанс на "безумный матч" с повышенным base λ.
     """
-    base = 1.6  # среднее голов за матч у одной команды
+    # 10% шанс на результативный матч (3-5 голов на команду)
+    if random.random() < 0.10:
+        base = random.uniform(2.5, 3.5)
+    else:
+        base = 1.6
+
     diff = (home_str - away_str) / 10.0
     diff = max(-2.5, min(2.5, diff))
-    home_lambda = base + diff * 0.5 + random.uniform(-0.3, 0.3)
-    away_lambda = base - diff * 0.5 + random.uniform(-0.3, 0.3)
+    # Уменьшили влияние разницы 0.5 → 0.3 (слабая команда имеет больше шансов)
+    home_lambda = base + diff * 0.3 + random.uniform(-0.4, 0.4)
+    away_lambda = base - diff * 0.3 + random.uniform(-0.4, 0.4)
     return max(0.1, home_lambda), max(0.1, away_lambda)
 
 
