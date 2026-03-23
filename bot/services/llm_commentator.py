@@ -160,7 +160,24 @@ async def commentate_match(
             f"🏠 {result.home_goals} — {result.away_goals} ✈️"
         )
 
-    # Финал
+    # Финал — список голов
+    goals = [e for e in events_data if e["type"] == "goal"]
+    goals_by_team: dict[str, list[str]] = {home_username: [], away_username: []}
+    for e in sorted(goals, key=lambda x: x["minute"]):
+        scorer = e.get("scorer") or {}
+        assist = e.get("assist")
+        owner = scorer.get("owner", "")
+        name = scorer.get("name", "?")
+        assist_str = f" (acc. {assist['name']})" if assist else ""
+        line = f"{name}{assist_str} {e['minute']}'"
+        team_name = home_username if e["team"] == "home" else away_username
+        goals_by_team.setdefault(team_name, []).append(line)
+
+    goals_text = ""
+    for team_name, glist in goals_by_team.items():
+        if glist:
+            goals_text += f"\n{team_name}: " + ", ".join(glist)
+
     if result.home_goals > result.away_goals:
         winner_line = f"🏆 Победа {home_username}!"
     elif result.away_goals > result.home_goals:
@@ -170,7 +187,8 @@ async def commentate_match(
 
     messages.append(
         f"🏁 ФИНАЛЬНЫЙ СВИСТОК!\n\n"
-        f"🏠 {home_username} {result.home_goals} — {result.away_goals} {away_username} ✈️\n\n"
+        f"🏠 {home_username} {result.home_goals} — {result.away_goals} {away_username} ✈️"
+        f"{goals_text}\n\n"
         f"{winner_line}"
     )
 
