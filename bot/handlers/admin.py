@@ -95,7 +95,10 @@ async def cmd_givepak(message: Message) -> None:
         await message.reply("user_id должен быть числом.")
         return
 
-    pack_type = "special" if len(parts) > 2 and parts[2] == "special" else "weekly"
+    valid_types = {"weekly", "special", "russia"}
+    pack_type = parts[2] if len(parts) > 2 and parts[2] in valid_types else "weekly"
+
+    pack_names = {"weekly": "еженедельный", "special": "специальный", "russia": "🇷🇺 Россия"}
 
     async with AsyncSessionLocal() as session:
         await give_pending_pack(session, target_id, pack_type)
@@ -103,12 +106,12 @@ async def cmd_givepak(message: Message) -> None:
     try:
         await message.bot.send_message(
             target_id,
-            f"🎴 Тебе выдан {'специальный' if pack_type == 'special' else 'еженедельный'} пак!\n\nОткрой его командой /openpack",
+            f"🎴 Тебе выдан {pack_names[pack_type]} пак!\n\nОткрой его командой /openpack",
         )
     except Exception:
         pass
 
-    await message.reply(f"✅ Пак добавлен в очередь игрока ID{target_id}.")
+    await message.reply(f"✅ Пак «{pack_names[pack_type]}» добавлен в очередь игрока ID{target_id}.\n\nДоступные типы: weekly, special, russia")
 
 
 @router.message(Command("starttournament"))

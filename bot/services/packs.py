@@ -30,6 +30,10 @@ PACK_WEIGHTS = {
         "ranges": [(65, 74), (75, 84), (85, 99)],
         "weights": [90, 10, 0],
     },
+    "russia": {
+        "ranges": [(65, 74), (75, 84), (85, 99)],
+        "weights": [55, 35, 10],
+    },
 }
 
 # Позиции по схеме 4-4-2 для стартового пака
@@ -121,6 +125,9 @@ async def open_pack(
 
     if pack_type == "starter":
         players_out = await _open_starter_pack(session, user_id, used_player_ids)
+    elif pack_type == "russia":
+        players_out = await _open_russia_pack(session, used_player_ids)
+        # russia-пак = 1 карточка, выход сразу
     else:
         count = 5
         # weekly / special
@@ -179,6 +186,23 @@ async def _open_starter_pack(
     return players_out
 
 
+async def _open_russia_pack(
+    session: AsyncSession,
+    used_ids: set[int],
+) -> list[Player]:
+    """Россия-пак: 1 случайный игрок сборной России."""
+    query = select(Player).where(
+        Player.nationality == "Russia",
+        Player.id.notin_(used_ids) if used_ids else True,
+    )
+    result = await session.execute(query)
+    russian_players = result.scalars().all()
+    if not russian_players:
+        return []
+    player = random.choice(russian_players)
+    return [player]
+
+
 async def give_pending_pack(session: AsyncSession, user_id: int, pack_type: str = "weekly") -> None:
     """Добавляет неоткрытый пак в очередь игрока."""
     pack = PendingPack(user_id=user_id, pack_type=pack_type)
@@ -224,7 +248,7 @@ async def has_starter_pack(session: AsyncSession, user_id: int) -> bool:
 
 def format_pack_announcement(username: str, players: list[Player], pack_type: str = "weekly") -> str:
     """Формирует текстовый анонс открытия пака (без фото)."""
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия"}
     header = stars.get(pack_type, "🎴")
 
     lines = [f"{header} @{username} открыл пак!\n"]
@@ -250,7 +274,7 @@ async def send_pack_with_photos(
     """
     from aiogram.types import InputMediaPhoto
 
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия"}
     header = stars.get(pack_type, "🎴")
 
     # Берём только игроков с фото (макс 10 для медиагруппы)
