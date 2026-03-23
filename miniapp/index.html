@@ -664,6 +664,12 @@ async function loadSquad() {
 }
 
 async function saveSquad() {
+  const allSlots = FORMATIONS[formation].flat();
+  const emptySlots = allSlots.filter(slot => !squad[slot]);
+  if (emptySlots.length > 0) {
+    showToast(`⚠️ Не заполнено слотов: ${emptySlots.length} (${emptySlots.join(', ')})`, 3500);
+  }
+
   const btn = document.getElementById('saveBtn');
   btn.disabled = true;
   btn.textContent = '...';
