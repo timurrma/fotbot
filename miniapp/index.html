@@ -184,6 +184,18 @@
     padding: 1px 3px;
     color: var(--gold);
   }
+  .slot-penalty {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    z-index: 10;
+    background: #c0392b;
+    border-radius: 6px;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 1px 3px;
+    color: #fff;
+  }
   .slot-label {
     font-size: 9px;
     color: rgba(255,255,255,0.5);
@@ -449,6 +461,35 @@ const SLOT_POSITION = {
   ST: 'ST', ST1: 'ST', ST2: 'ST',
 };
 
+// Зоны позиций (как в simulation.py)
+const POSITION_ZONES = {
+  GK: 0,
+  CB: 1, LB: 1, RB: 1,
+  CDM: 2, CM: 2, LM: 2, RM: 2,
+  CAM: 3, LW: 3, RW: 3,
+  CF: 4, ST: 4,
+};
+
+function computePenalty(card, slotName) {
+  const slotPos = SLOT_POSITION[slotName];
+  if (!slotPos || !card) return 0;
+  const playerPositions = card.positions || [card.position];
+
+  // Своя позиция
+  if (playerPositions.includes(slotPos)) return 0;
+
+  // Вратарь/не вратарь
+  const isPlayerGK = playerPositions.includes('GK');
+  const isSlotGK = slotPos === 'GK';
+  if (isPlayerGK !== isSlotGK) return -30;
+
+  // Зоны
+  const playerZone = Math.max(...playerPositions.map(p => POSITION_ZONES[p] ?? 2));
+  const slotZone = POSITION_ZONES[slotPos] ?? 2;
+  if (Math.abs(playerZone - slotZone) <= 1) return -5;
+  return -10;
+}
+
 // ─── State ───────────────────────────────────────────────────────────────────
 let tg = window.Telegram?.WebApp;
 let userId = null;
@@ -617,10 +658,19 @@ function makeSlotEl(slotName) {
     }
     avatar.appendChild(photoWrap);
     // Рейтинг поверх, z-index выше
+    const penalty = computePenalty(card, slotName);
     const ratingEl = document.createElement('div');
     ratingEl.className = 'slot-rating';
-    ratingEl.textContent = card.rating;
+    ratingEl.textContent = card.rating + penalty;
+    ratingEl.style.color = penalty < 0 ? '#e74c3c' : 'var(--gold)';
     avatar.appendChild(ratingEl);
+    // Штраф бейдж
+    if (penalty < 0) {
+      const penaltyEl = document.createElement('div');
+      penaltyEl.className = 'slot-penalty';
+      penaltyEl.textContent = penalty;
+      avatar.appendChild(penaltyEl);
+    }
   } else {
     const icon = document.createElement('span');
     icon.className = 'slot-icon';
