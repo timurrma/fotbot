@@ -172,46 +172,92 @@ def _pick_by_prob(slots: list[PlayerSlot], prob_table: dict[str, int]) -> Option
     return random.choices(slots, weights=weights, k=1)[0]
 
 
-def generate_events(
-    home_goals: int,
-    away_goals: int,
+def _generate_goals_for_phase(
+    h_lam: float,
+    a_lam: float,
     home_lineup: list[PlayerSlot],
     away_lineup: list[PlayerSlot],
-) -> tuple[list[MatchEvent], dict, dict]:
+    home_stats: dict,
+    away_stats: dict,
+    used_minutes: set,
+    minute_lo: int,
+    minute_hi: int,
+) -> list[MatchEvent]:
+    """Генерирует голы для одной фазы матча (до или после красной)."""
+    import math
+    events = []
+
+    def pick_minute(lo: int, hi: int) -> int:
+        if lo > hi:
+            lo, hi = hi, lo
+        m = random.randint(lo, hi)
+        attempts = 0
+        while m in used_minutes and attempts < 20:
+            m = random.randint(lo, hi)
+            attempts += 1
+        used_minutes.add(m)
+        return m
+
+    duration = max(1, minute_hi - minute_lo)
+    # Масштабируем λ на длину фазы (из расчёта полного матча = 90 мин)
+    h_goals = poisson_goals(h_lam * duration / 90)
+    a_goals = poisson_goals(a_lam * duration / 90)
+
+    for team, n_goals in [("home", h_goals), ("away", a_goals)]:
+        lineup = home_lineup if team == "home" else away_lineup
+        stats = home_stats if team == "home" else away_stats
+        for _ in range(n_goals):
+            minute = pick_minute(minute_lo, minute_hi)
+            scorer = _pick_by_prob(lineup, GOAL_PROBS)
+            assister_candidates = [s for s in lineup if s != scorer]
+            assister = _pick_by_prob(assister_candidates, ASSIST_PROBS) if random.random() < 0.7 else None
+            events.append(MatchEvent(
+                minute=minute,
+                event_type="goal",
+                scorer_slot=scorer,
+                assist_slot=assister,
+                team=team,
+            ))
+            if scorer:
+                cid = scorer.user_card_id
+                stats.setdefault(cid, {"goals": 0, "assists": 0, "player_id": scorer.player.id})
+                stats[cid]["goals"] += 1
+            if assister:
+                cid = assister.user_card_id
+                stats.setdefault(cid, {"goals": 0, "assists": 0, "player_id": assister.player.id})
+                stats[cid]["assists"] += 1
+
+    return events
+
+
+def generate_events(
+    h_lam: float,
+    a_lam: float,
+    home_lineup: list[PlayerSlot],
+    away_lineup: list[PlayerSlot],
+) -> tuple[list[MatchEvent], dict, dict, int, int]:
     """Генерирует события матча: голы, ассисты, карточки, промахи.
 
-    Красная карточка меняет шансы оставшихся голов: команда в меньшинстве
-    теряет часть ожидаемых голов, а соперник получает дополнительный шанс.
+    Если выпадает красная карточка — голы после неё пересчитываются с новым λ:
+    команда в меньшинстве ×0.6, соперник ×1.3. Чем раньше красная — тем сильнее эффект.
     """
     events: list[MatchEvent] = []
     home_stats: dict[int, dict] = {}
     away_stats: dict[int, dict] = {}
-
     used_minutes: set[int] = set()
 
     def pick_minute(lo: int = 1, hi: int = 90) -> int:
+        if lo > hi:
+            lo, hi = hi, lo
         m = random.randint(lo, hi)
-        while m in used_minutes:
+        attempts = 0
+        while m in used_minutes and attempts < 20:
             m = random.randint(lo, hi)
+            attempts += 1
         used_minutes.add(m)
         return m
 
-    # Жёлтые карточки (1-3 штуки) — случайные минуты
-    n_yellow = random.randint(1, 3)
-    yellow_events: list[MatchEvent] = []
-    for _ in range(n_yellow):
-        team = random.choice(["home", "away"])
-        lineup = home_lineup if team == "home" else away_lineup
-        player_slot = random.choice(lineup) if lineup else None
-        if player_slot:
-            yellow_events.append(MatchEvent(
-                minute=pick_minute(),
-                event_type="yellow_card",
-                scorer_slot=player_slot,
-                team=team,
-            ))
-
-    # Красная карточка (с вероятностью 15%) — минута определяет момент перелома
+    # Красная карточка (15% шанс)
     red_minute: Optional[int] = None
     red_team: Optional[str] = None
     if random.random() < 0.15:
@@ -228,87 +274,62 @@ def generate_events(
                 team=team,
             ))
 
-    # Распределяем голы с учётом красной карточки
-    # Голы до красной — пропорционально минуте; после — с поправкой на меньшинство
-    def split_goals_by_red(total: int, team: str) -> tuple[int, int]:
-        """Возвращает (голов до красной, голов после красной) для команды."""
-        if red_minute is None or total == 0:
-            return 0, total
-        fraction_before = red_minute / 90.0
-        before = sum(1 for _ in range(total) if random.random() < fraction_before)
-        after = total - before
-        return before, after
-
-    home_before, home_after = split_goals_by_red(home_goals, "home")
-    away_before, away_after = split_goals_by_red(away_goals, "away")
-
-    # Если красная у home — home после красной теряет 1 гол, away получает +1
-    # Если красная у away — наоборот
     if red_minute is not None:
-        if red_team == "home":
-            # home в меньшинстве — убираем 1 гол после красной (если есть), away добавляем 1
-            if home_after > 0 and random.random() < 0.5:
-                home_after -= 1
-                away_after += 1
-        else:
-            if away_after > 0 and random.random() < 0.5:
-                away_after -= 1
-                home_after += 1
-
-    home_goals_final = home_before + home_after
-    away_goals_final = away_before + away_after
-
-    # Генерируем голы
-    all_goals: list[tuple[str, int | None]] = []
-    if red_minute is not None:
-        # Голы до красной — в диапазоне 1..red_minute-1
-        for _ in range(home_before):
-            all_goals.append(("home", pick_minute(1, max(1, red_minute - 1))))
-        for _ in range(away_before):
-            all_goals.append(("away", pick_minute(1, max(1, red_minute - 1))))
-        # Голы после красной — в диапазоне red_minute+1..90
-        for _ in range(home_after):
-            all_goals.append(("home", pick_minute(min(90, red_minute + 1), 90)))
-        for _ in range(away_after):
-            all_goals.append(("away", pick_minute(min(90, red_minute + 1), 90)))
-    else:
-        for _ in range(home_goals_final):
-            all_goals.append(("home", None))
-        for _ in range(away_goals_final):
-            all_goals.append(("away", None))
-
-    for team, fixed_minute in all_goals:
-        lineup = home_lineup if team == "home" else away_lineup
-        stats = home_stats if team == "home" else away_stats
-        minute = fixed_minute if fixed_minute is not None else pick_minute()
-
-        scorer = _pick_by_prob(lineup, GOAL_PROBS)
-        assister_candidates = [s for s in lineup if s != scorer]
-        assister = _pick_by_prob(assister_candidates, ASSIST_PROBS) if random.random() < 0.7 else None
-
-        event = MatchEvent(
-            minute=minute,
-            event_type="goal",
-            scorer_slot=scorer,
-            assist_slot=assister,
-            team=team,
+        # Фаза 1: до красной (1..red_minute-1) — обычные λ
+        phase1 = _generate_goals_for_phase(
+            h_lam, a_lam,
+            home_lineup, away_lineup,
+            home_stats, away_stats,
+            used_minutes,
+            minute_lo=1, minute_hi=max(1, red_minute - 1),
         )
-        events.append(event)
+        events.extend(phase1)
 
-        if scorer:
-            cid = scorer.user_card_id
-            stats.setdefault(cid, {"goals": 0, "assists": 0, "player_id": scorer.player.id})
-            stats[cid]["goals"] += 1
-        if assister:
-            cid = assister.user_card_id
-            stats.setdefault(cid, {"goals": 0, "assists": 0, "player_id": assister.player.id})
-            stats[cid]["assists"] += 1
+        # Фаза 2: после красной (red_minute+1..90) — скорректированные λ
+        remaining = 90 - red_minute
+        scale = remaining / 90  # чем позже красная — тем меньше эффект
 
-    events.extend(yellow_events)
+        if red_team == "home":
+            h_lam2 = h_lam * (1 - 0.4 * scale)   # home теряет до 40% угрозы
+            a_lam2 = a_lam * (1 + 0.3 * scale)    # away получает до 30% бонуса
+        else:
+            a_lam2 = a_lam * (1 - 0.4 * scale)
+            h_lam2 = h_lam * (1 + 0.3 * scale)
+
+        phase2 = _generate_goals_for_phase(
+            h_lam2, a_lam2,
+            home_lineup, away_lineup,
+            home_stats, away_stats,
+            used_minutes,
+            minute_lo=min(90, red_minute + 1), minute_hi=90,
+        )
+        events.extend(phase2)
+    else:
+        # Нет красной — обычная генерация за весь матч
+        phase = _generate_goals_for_phase(
+            h_lam, a_lam,
+            home_lineup, away_lineup,
+            home_stats, away_stats,
+            used_minutes,
+            minute_lo=1, minute_hi=90,
+        )
+        events.extend(phase)
+
+    # Жёлтые карточки (1-3 штуки)
+    for _ in range(random.randint(1, 3)):
+        team = random.choice(["home", "away"])
+        lineup = home_lineup if team == "home" else away_lineup
+        player_slot = random.choice(lineup) if lineup else None
+        if player_slot:
+            events.append(MatchEvent(
+                minute=pick_minute(),
+                event_type="yellow_card",
+                scorer_slot=player_slot,
+                team=team,
+            ))
 
     # Промахи/моменты (1-3 штуки)
-    n_miss = random.randint(1, 3)
-    for _ in range(n_miss):
+    for _ in range(random.randint(1, 3)):
         team = random.choice(["home", "away"])
         lineup = home_lineup if team == "home" else away_lineup
         player_slot = _pick_by_prob(lineup, GOAL_PROBS) if lineup else None
@@ -322,7 +343,6 @@ def generate_events(
 
     events.sort(key=lambda e: e.minute)
 
-    # Пересчитываем итоговый счёт из событий (т.к. мог измениться после корректировки)
     actual_home = sum(1 for e in events if e.event_type == "goal" and e.team == "home")
     actual_away = sum(1 for e in events if e.event_type == "goal" and e.team == "away")
 
@@ -346,11 +366,9 @@ def simulate_match(
     a_str = team_strength(away_lineup)
 
     h_lam, a_lam = expected_goals(h_str, a_str)
-    h_goals = poisson_goals(h_lam)
-    a_goals = poisson_goals(a_lam)
 
     events, home_stats, away_stats, actual_home, actual_away = generate_events(
-        h_goals, a_goals, home_lineup, away_lineup
+        h_lam, a_lam, home_lineup, away_lineup
     )
 
     return MatchResult(
