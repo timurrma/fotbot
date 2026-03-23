@@ -12,11 +12,11 @@ from datetime import datetime, timezone
 from itertools import combinations
 
 from aiogram import Bot
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config import settings
-from bot.db.models import Match, MatchStat, Tournament, UserCard, UserSquad, Whitelist
+from bot.db.models import Match, MatchStat, Player, Tournament, UserCard, UserSquad, Whitelist
 from bot.db.session import AsyncSessionLocal
 from bot.services.llm_commentator import commentate_match, format_match_summary
 from bot.services.simulation import events_to_dict, simulate_match, FORMATIONS_SLOTS
@@ -216,6 +216,10 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         away_wl = await session.get(Whitelist, match.away_user_id)
         _home_name = (home_wl.username if home_wl and home_wl.username else None) or f"ID{match.home_user_id}"
         _away_name = (away_wl.username if away_wl and away_wl.username else None) or f"ID{match.away_user_id}"
+        wl_map = {
+            match.home_user_id: _home_name,
+            match.away_user_id: _away_name,
+        }
 
         await bot.send_message(
             settings.group_id,
@@ -254,6 +258,38 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
 
         _save_stats(match.home_user_id, home_cards, result.home_stats)
         _save_stats(match.away_user_id, away_cards, result.away_stats)
+
+        await session.flush()
+
+        # MVP матча — игрок с макс голами+ассистами
+        all_stats = {**result.home_stats, **result.away_stats}
+        mvp_card_id = max(all_stats, key=lambda cid: all_stats[cid]["goals"] + all_stats[cid]["assists"], default=None)
+        mvp_text = None
+        if mvp_card_id and mvp_card_id != -1:
+            mvp_stat = all_stats[mvp_card_id]
+            if mvp_stat["goals"] + mvp_stat["assists"] > 0:
+                # Обновляем mvp_count в match_stats
+                from sqlalchemy import and_
+                mvp_row_result = await session.execute(
+                    select(MatchStat).where(
+                        and_(MatchStat.match_id == match.id, MatchStat.user_card_id == mvp_card_id)
+                    )
+                )
+                mvp_row = mvp_row_result.scalar_one_or_none()
+                if mvp_row:
+                    mvp_row.mvp_count = 1
+                    mvp_owner = wl_map.get(mvp_row.user_id, f"ID{mvp_row.user_id}")
+                    g = mvp_stat["goals"]
+                    a = mvp_stat["assists"]
+                    # Получаем имя игрока
+                    mvp_player_result = await session.execute(
+                        select(MatchStat).where(
+                            and_(MatchStat.match_id == match.id, MatchStat.user_card_id == mvp_card_id)
+                        )
+                    )
+                    mvp_player_name = mvp_row.player.name if mvp_row.player else "?"
+                    stat_str = f"⚽{g}" + (f" 🎯{a}" if a else "")
+                    mvp_text = f"🏅 <b>MVP матча:</b> {mvp_player_name} (@{mvp_owner}) — {stat_str}"
 
         await session.commit()
 
@@ -298,16 +334,47 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             summary = format_match_summary(home_name, away_name, result, events_data)
             await bot.send_message(settings.group_id, summary)
 
+        # MVP матча
+        if mvp_text:
+            await asyncio.sleep(2)
+            await bot.send_message(settings.group_id, mvp_text, parse_mode="HTML")
+
         # Итоги турнира если все матчи сыграны
         if tournament_finished:
             await asyncio.sleep(3)
-            await bot.send_message(
-                settings.group_id,
-                f"🏁 <b>Турнир недели завершён!</b>\n\n{final_standings}",
-                parse_mode="HTML",
-            )
+            # MVP турнира
+            tournament_mvp_text = await _get_tournament_mvp_text(session, tournament.id, wl_map)
+            standings_msg = f"🏁 <b>Турнир недели завершён!</b>\n\n{final_standings}"
+            if tournament_mvp_text:
+                standings_msg += f"\n\n{tournament_mvp_text}"
+            await bot.send_message(settings.group_id, standings_msg, parse_mode="HTML")
 
         return True
+
+
+async def _get_tournament_mvp_text(session: AsyncSession, tournament_id: int, wl_map: dict) -> str | None:
+    """Возвращает текст с MVP турнира — игрок с макс г+п за турнир."""
+    result = await session.execute(
+        select(
+            MatchStat.user_id,
+            MatchStat.player_id,
+            Player.name,
+            func.sum(MatchStat.goals).label("g"),
+            func.sum(MatchStat.assists).label("a"),
+        )
+        .join(Player, MatchStat.player_id == Player.id)
+        .join(Match, MatchStat.match_id == Match.id)
+        .where(Match.tournament_id == tournament_id)
+        .group_by(MatchStat.user_id, MatchStat.player_id, Player.name)
+        .order_by((func.sum(MatchStat.goals) + func.sum(MatchStat.assists)).desc())
+        .limit(1)
+    )
+    row = result.first()
+    if not row or (row.g + row.a) == 0:
+        return None
+    owner = wl_map.get(row.user_id, f"ID{row.user_id}")
+    stat_str = f"⚽{row.g}" + (f" 🎯{row.a}" if row.a else "")
+    return f"🏆 <b>MVP турнира:</b> {row.name} (@{owner}) — {stat_str}"
 
 
 async def auto_announce_results(bot: Bot) -> None:

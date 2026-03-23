@@ -181,6 +181,43 @@ async def get_tournament_record(
     return {"wins": w, "draws": d, "losses": l, "played": w + d + l}
 
 
+async def get_top_mvp(
+    session: AsyncSession,
+    limit: int = 5,
+    tournament_id: int | None = None,
+) -> list[dict]:
+    """Топ по количеству MVP-наград."""
+    query = (
+        select(
+            MatchStat.user_id,
+            MatchStat.player_id,
+            Player.name,
+            func.sum(MatchStat.mvp_count).label("total_mvp"),
+            func.sum(MatchStat.appearances).label("appearances"),
+        )
+        .join(Player, MatchStat.player_id == Player.id)
+        .group_by(MatchStat.user_id, MatchStat.player_id, Player.name)
+        .having(func.sum(MatchStat.mvp_count) > 0)
+        .order_by(func.sum(MatchStat.mvp_count).desc())
+        .limit(limit)
+    )
+    if tournament_id is not None:
+        query = query.join(Match, MatchStat.match_id == Match.id).where(
+            Match.tournament_id == tournament_id
+        )
+    result = await session.execute(query)
+    return [
+        {
+            "user_id": row.user_id,
+            "player_id": row.player_id,
+            "player_name": row.name,
+            "mvp_count": row.total_mvp,
+            "appearances": row.appearances,
+        }
+        for row in result.all()
+    ]
+
+
 def format_scorers(rows: list[dict], title: str) -> str:
     lines = [f"*{title}*\n"]
     for i, row in enumerate(rows, 1):

@@ -158,6 +158,7 @@ class MatchStat(Base):
     goals: Mapped[int] = mapped_column(Integer, default=0)
     assists: Mapped[int] = mapped_column(Integer, default=0)
     appearances: Mapped[int] = mapped_column(Integer, default=0)
+    mvp_count: Mapped[int] = mapped_column(Integer, default=0)
 
     match: Mapped["Match"] = relationship("Match", back_populates="stats")
     player: Mapped["Player"] = relationship("Player", lazy="joined")
