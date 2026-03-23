@@ -80,6 +80,14 @@ async def get_or_create_tournament(session: AsyncSession) -> Tournament:
     return t
 
 
+async def get_active_tournament(session: AsyncSession) -> Tournament | None:
+    """Возвращает турнир со статусом running, или None если такого нет."""
+    result = await session.execute(
+        select(Tournament).where(Tournament.status == "running").limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_next_unplayed_match(
     session: AsyncSession,
     tournament: Tournament,
@@ -156,7 +164,10 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
     Возвращает True если матч был сыгран, False если матчей больше нет.
     """
     async with AsyncSessionLocal() as session:
-        tournament = await get_or_create_tournament(session)
+        tournament = await get_active_tournament(session)
+        if not tournament:
+            return False
+
         await ensure_matches_created(session, tournament)
 
         match = await get_next_unplayed_match(session, tournament)
@@ -200,6 +211,12 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             session.add(s)
 
         await session.commit()
+
+        # Если больше нет несыгранных матчей — помечаем турнир завершённым
+        remaining = await get_next_unplayed_match(session, tournament)
+        if not remaining:
+            tournament.status = "finished"
+            await session.commit()
 
         # Юзернеймы
         try:
@@ -250,7 +267,9 @@ async def auto_announce_results(bot: Bot) -> None:
     Вызывается по расписанию если за день никто не вызвал /nextmatch.
     """
     async with AsyncSessionLocal() as session:
-        tournament = await get_or_create_tournament(session)
+        tournament = await get_active_tournament(session)
+        if not tournament:
+            return
         await ensure_matches_created(session, tournament)
 
         result = await session.execute(
@@ -319,6 +338,10 @@ async def auto_announce_results(bot: Bot) -> None:
             summary = format_match_summary(home_name, away_name, sim_result, events_data)
             await bot.send_message(settings.group_id, summary)
             await asyncio.sleep(1.5)
+
+        # Все матчи сыграны — помечаем турнир завершённым
+        tournament.status = "finished"
+        await session.commit()
 
 
 async def build_standings_text(session: AsyncSession, tournament_id: int | None = None) -> str:

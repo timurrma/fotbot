@@ -105,12 +105,66 @@ async def cmd_givepak(message: Message) -> None:
     await message.reply(f"✅ Пак выдан игроку {username}.")
 
 
+@router.message(Command("starttournament"))
+async def cmd_starttournament(message: Message) -> None:
+    """Создать и запустить новый турнир (только для админа)."""
+    if not is_admin(message.from_user.id):
+        return
+
+    from datetime import datetime, timezone
+    from bot.db.models import Tournament
+    from bot.services.tournament import ensure_matches_created
+
+    now = datetime.now(timezone.utc)
+    week = now.isocalendar()[1]
+    year = now.year
+
+    async with AsyncSessionLocal() as session:
+        from sqlalchemy import select as sa_select
+        result = await session.execute(
+            sa_select(Tournament).where(
+                Tournament.week_number == week,
+                Tournament.year == year,
+            )
+        )
+        t = result.scalar_one_or_none()
+
+        if t:
+            if t.status == "running":
+                await message.reply("⚠️ Турнир уже активен!")
+                return
+            # Перезапускаем завершённый или ожидающий
+            t.status = "running"
+        else:
+            t = Tournament(week_number=week, year=year, status="running")
+            session.add(t)
+
+        await session.commit()
+        await session.refresh(t)
+        await ensure_matches_created(session, t)
+
+    await message.bot.send_message(
+        settings.group_id,
+        f"🏆 <b>Турнир недели #{week} начался!</b>\n\n"
+        "Настройте состав в боте и ждите матчей.\n"
+        "Матчи запускаются командой /nextmatch",
+        parse_mode="HTML",
+    )
+    await message.reply(f"✅ Турнир #{week} запущен!")
+
+
 @router.message(Command("nextmatch"))
 async def cmd_nextmatch(message: Message) -> None:
     """Запустить следующий матч турнира с LLM-комментарием."""
-    from bot.services.tournament import play_next_match
+    from bot.services.tournament import get_active_tournament, play_next_match
 
-    # Доступно всем из whitelist (проверяется middleware) или только в группе
+    async with AsyncSessionLocal() as session:
+        active = await get_active_tournament(session)
+
+    if not active:
+        await message.reply("❌ Нет активного турнира. Запустите турнир командой /starttournament.")
+        return
+
     await message.reply("⚽ Запускаю следующий матч...")
     played = await play_next_match(message.bot, with_commentary=True)
     if not played:
