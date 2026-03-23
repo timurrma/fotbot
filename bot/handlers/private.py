@@ -8,7 +8,14 @@ from sqlalchemy import select
 from bot.config import settings
 from bot.db.models import UserCard, Whitelist
 from bot.db.session import AsyncSessionLocal
-from bot.services.packs import has_starter_pack, open_pack, send_pack_with_photos
+from bot.services.packs import (
+    get_pending_packs,
+    give_pending_pack,
+    has_starter_pack,
+    open_pack,
+    open_pending_pack,
+    send_pack_with_photos,
+)
 from bot.services.simulation import FORMATIONS_SLOTS
 from bot.services.stats import format_scorers, get_tournament_record, get_user_stats
 from bot.services.transfers import (
@@ -66,6 +73,42 @@ async def cmd_start(message: Message) -> None:
 
 
 # ─── /mystats ─────────────────────────────────────────────────────────────────
+
+@router.message(Command("mypacks"))
+async def cmd_mypacks(message: Message) -> None:
+    """Показать количество неоткрытых паков."""
+    user_id = message.from_user.id
+    async with AsyncSessionLocal() as session:
+        packs = await get_pending_packs(session, user_id)
+
+    if not packs:
+        await message.answer("📦 У тебя нет неоткрытых паков.")
+        return
+
+    lines = [f"📦 У тебя {len(packs)} неоткрытых пак(а/ов):\n"]
+    for i, p in enumerate(packs, 1):
+        type_name = {"weekly": "Еженедельный", "special": "Специальный"}.get(p.pack_type, p.pack_type)
+        lines.append(f"  {i}. {type_name}")
+    lines.append("\nОткрой командой /openpack")
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("openpack"))
+async def cmd_openpack(message: Message) -> None:
+    """Открыть первый неоткрытый пак."""
+    user_id = message.from_user.id
+    username = message.from_user.username or message.from_user.full_name
+
+    async with AsyncSessionLocal() as session:
+        players = await open_pending_pack(session, user_id)
+
+    if players is None:
+        await message.answer("📦 У тебя нет неоткрытых паков.")
+        return
+
+    await send_pack_with_photos(message.bot, message.chat.id, username, players, "weekly")
+    await send_pack_with_photos(message.bot, settings.group_id, username, players, "weekly")
+
 
 @router.message(Command("mystats"))
 async def cmd_mystats(message: Message) -> None:

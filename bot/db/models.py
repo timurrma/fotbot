@@ -97,6 +97,16 @@ class PackHistory(Base):
         self.player_ids_json = json.dumps(value)
 
 
+class PendingPack(Base):
+    """Накопленные но не открытые паки."""
+    __tablename__ = "pending_packs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    pack_type: Mapped[str] = mapped_column(String(20), default="weekly")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+
+
 class Tournament(Base):
     """Турнир."""
     __tablename__ = "tournaments"

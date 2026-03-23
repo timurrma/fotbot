@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bot.config import settings
 from bot.db.models import Whitelist
 from bot.db.session import AsyncSessionLocal
-from bot.services.packs import open_pack, send_pack_with_photos
+from bot.services.packs import give_pending_pack
 
 router = Router()
 
@@ -98,16 +98,17 @@ async def cmd_givepak(message: Message) -> None:
     pack_type = "special" if len(parts) > 2 and parts[2] == "special" else "weekly"
 
     async with AsyncSessionLocal() as session:
-        players = await open_pack(session, target_id, pack_type)
+        await give_pending_pack(session, target_id, pack_type)
 
     try:
-        chat = await message.bot.get_chat(target_id)
-        username = chat.username or chat.full_name or f"ID{target_id}"
+        await message.bot.send_message(
+            target_id,
+            f"🎴 Тебе выдан {'специальный' if pack_type == 'special' else 'еженедельный'} пак!\n\nОткрой его командой /openpack",
+        )
     except Exception:
-        username = f"ID{target_id}"
+        pass
 
-    await send_pack_with_photos(message.bot, settings.group_id, username, players, pack_type)
-    await message.reply(f"✅ Пак выдан игроку {username}.")
+    await message.reply(f"✅ Пак добавлен в очередь игрока ID{target_id}.")
 
 
 @router.message(Command("starttournament"))

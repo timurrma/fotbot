@@ -24,7 +24,17 @@
       "Bash(git filter-branch:*)",
       "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --env-filter ':*)",
       "Bash(git stash:*)",
-      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git ls-files -s .env.example | while read mode hash stage file; do:*)"
+      "Bash(FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch --force --index-filter 'git ls-files -s .env.example | while read mode hash stage file; do:*)",
+      "Bash(brew install:*)",
+      "Bash(railway login:*)",
+      "Bash(railway link:*)",
+      "Bash(railway status:*)",
+      "Bash(railway logs:*)",
+      "Bash(railway variables:*)",
+      "Bash(railway run python -c \":*)",
+      "Bash(railway run:*)",
+      "Bash(psql \"postgresql://postgres:xDzWGvMEdLELWzecMPnzxpbSJNptUhZE@caboose.proxy.rlwy.net:44501/railway\" -c \"SELECT user_id, username FROM whitelist;\")",
+      "Bash(psql \"postgresql://postgres:xDzWGvMEdLELWzecMPnzxpbSJNptUhZE@caboose.proxy.rlwy.net:44501/railway\" -c \"\\\\d tournaments\")"
     ]
   }
 }

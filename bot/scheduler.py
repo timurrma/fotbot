@@ -71,11 +71,12 @@ async def _auto_results(bot) -> None:
 
 
 async def _weekly_packs(bot) -> None:
-    """Раздаёт еженедельные паки всем игрокам из whitelist."""
+    """Выдаёт неоткрытые паки всем игрокам из whitelist."""
     from bot.db.session import AsyncSessionLocal
     from bot.db.models import Whitelist
-    from bot.services.packs import open_pack, send_pack_with_photos
+    from bot.services.packs import give_pending_pack
     from sqlalchemy import select
+    import asyncio
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(Whitelist))
@@ -83,22 +84,20 @@ async def _weekly_packs(bot) -> None:
 
     await bot.send_message(
         settings.group_id,
-        "🎴 Четверг — день паков! Открываем...",
+        "🎴 Четверг — день паков! Каждый получил пак — открой его командой /openpack в личных сообщениях.",
     )
 
-    import asyncio
     for player in players:
         try:
             async with AsyncSessionLocal() as session:
-                cards = await open_pack(session, player.user_id, pack_type="weekly")
-
+                await give_pending_pack(session, player.user_id, pack_type="weekly")
             try:
-                chat = await bot.get_chat(player.user_id)
-                username = chat.username or chat.full_name or f"ID{player.user_id}"
+                await bot.send_message(
+                    player.user_id,
+                    "🎴 Тебе выдан еженедельный пак!\n\nОткрой его командой /openpack",
+                )
             except Exception:
-                username = player.username or f"ID{player.user_id}"
-
-            await send_pack_with_photos(bot, settings.group_id, username, cards, "weekly")
-            await asyncio.sleep(2)
+                pass
+            await asyncio.sleep(0.5)
         except Exception as e:
-            print(f"Ошибка раздачи пака для {player.user_id}: {e}")
+            print(f"Ошибка выдачи пака для {player.user_id}: {e}")

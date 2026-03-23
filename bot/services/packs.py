@@ -14,7 +14,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.db.models import PackHistory, Player, UserCard, UserSquad
+from bot.db.models import PackHistory, PendingPack, Player, UserCard, UserSquad
 
 # Вероятности рейтингов для разных паков
 PACK_WEIGHTS = {
@@ -177,6 +177,38 @@ async def _open_starter_pack(
                 has_high = True
 
     return players_out
+
+
+async def give_pending_pack(session: AsyncSession, user_id: int, pack_type: str = "weekly") -> None:
+    """Добавляет неоткрытый пак в очередь игрока."""
+    pack = PendingPack(user_id=user_id, pack_type=pack_type)
+    session.add(pack)
+    await session.commit()
+
+
+async def get_pending_packs(session: AsyncSession, user_id: int) -> list[PendingPack]:
+    """Возвращает список неоткрытых паков игрока."""
+    result = await session.execute(
+        select(PendingPack).where(PendingPack.user_id == user_id).order_by(PendingPack.created_at)
+    )
+    return result.scalars().all()
+
+
+async def open_pending_pack(session: AsyncSession, user_id: int) -> list[Player] | None:
+    """Открывает первый неоткрытый пак. Возвращает игроков или None если паков нет."""
+    result = await session.execute(
+        select(PendingPack).where(PendingPack.user_id == user_id).order_by(PendingPack.created_at).limit(1)
+    )
+    pending = result.scalar_one_or_none()
+    if not pending:
+        return None
+
+    pack_type = pending.pack_type
+    await session.delete(pending)
+    await session.flush()
+
+    players = await open_pack(session, user_id, pack_type)
+    return players
 
 
 async def has_starter_pack(session: AsyncSession, user_id: int) -> bool:
