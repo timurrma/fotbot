@@ -6,7 +6,7 @@ from aiogram.types import Message
 from sqlalchemy import select
 
 from bot.config import settings
-from bot.db.models import UserCard, UserSquad, Whitelist
+from bot.db.models import UserCard, Whitelist
 from bot.db.session import AsyncSessionLocal
 from bot.services.packs import has_starter_pack, open_pack, send_pack_with_photos
 from bot.services.simulation import FORMATIONS_SLOTS
@@ -53,37 +53,8 @@ async def cmd_start(message: Message) -> None:
         await message.answer(
             "👋 С возвращением!\n\n"
             "📋 Команды:\n"
-            "/squad — мой состав\n"
-            "/mystats — моя статистика\n"
-            "/transfers — трансферы"
+            "/mystats — моя статистика"
         )
-
-
-# ─── /squad — просмотр состава ────────────────────────────────────────────────
-
-@router.message(Command("squad"))
-async def cmd_squad(message: Message) -> None:
-    user_id = message.from_user.id
-    async with AsyncSessionLocal() as session:
-        squad = await session.get(UserSquad, user_id)
-        if not squad or not squad.slot_assignments:
-            await message.answer(
-                "Состав не настроен.\n"
-                "Настрой через кнопку Menu в чате с ботом."
-            )
-            return
-
-        formation = squad.formation
-        assignments = squad.slot_assignments
-        lines = [f"🏟 Схема: <b>{formation}</b>\n"]
-        for slot, card_id in sorted(assignments.items()):
-            card = await session.get(UserCard, card_id)
-            if card:
-                r = card.player.overall_rating
-                icon = "👑" if r >= 90 else "🌟" if r >= 85 else "⭐"
-                lines.append(f"  {slot}: {card.player.name} — {r}{icon}")
-
-    await message.answer("\n".join(lines), parse_mode="HTML")
 
 
 # ─── /mystats ─────────────────────────────────────────────────────────────────

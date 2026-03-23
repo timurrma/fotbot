@@ -120,6 +120,34 @@ async def ensure_matches_created(
     await session.commit()
 
 
+def _format_lineups(
+    home_name: str,
+    home_formation: str,
+    home_cards: list,
+    away_name: str,
+    away_formation: str,
+    away_cards: list,
+) -> str:
+    """Форматирует составы двух команд перед матчем."""
+    def lineup_lines(name: str, formation: str, cards: list) -> list[str]:
+        lines = [f"<b>{name}</b> ({formation})"]
+        for _, player in cards[:11]:
+            r = player.overall_rating
+            icon = "👑" if r >= 90 else "🌟" if r >= 85 else "⭐"
+            lines.append(f"  {player.position} {player.name} {r}{icon}")
+        return lines
+
+    home_lines = lineup_lines(home_name, home_formation, home_cards)
+    away_lines = lineup_lines(away_name, away_formation, away_cards)
+
+    return (
+        "📋 <b>Составы</b>\n\n"
+        + "\n".join(home_lines)
+        + "\n\n"
+        + "\n".join(away_lines)
+    )
+
+
 async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
     """
     Играет следующий несыгранный матч турнира.
@@ -183,6 +211,12 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             home_name = f"ID{match.home_user_id}"
             away_name = f"ID{match.away_user_id}"
 
+        # Составы перед матчем
+        lineup_text = _format_lineups(
+            home_name, home_formation, home_cards,
+            away_name, away_formation, away_cards,
+        )
+
         if with_commentary:
             try:
                 messages = await commentate_match(
@@ -193,13 +227,17 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             except Exception:
                 messages = [format_match_summary(home_name, away_name, result, events_data)]
 
-            for msg in messages:
+            # Вставляем составы первым сообщением
+            all_messages = [lineup_text] + messages
+            for msg in all_messages:
                 try:
                     await bot.send_message(settings.group_id, msg)
                     await asyncio.sleep(2)
                 except Exception:
                     pass
         else:
+            await bot.send_message(settings.group_id, lineup_text)
+            await asyncio.sleep(1)
             summary = format_match_summary(home_name, away_name, result, events_data)
             await bot.send_message(settings.group_id, summary)
 
