@@ -79,7 +79,7 @@ async def commentate_half(
 
     response = await client.chat.completions.create(
         model=model,
-        max_completion_tokens=3000,
+        max_completion_tokens=2000,
         messages=[
             {"role": "system", "content": skill_prompt},
             {"role": "user", "content": user_message},

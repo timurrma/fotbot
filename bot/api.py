@@ -191,6 +191,11 @@ async def save_squad(request: web.Request) -> web.Response:
     if not isinstance(slots, dict):
         return web.json_response({"error": "slots must be object"}, status=400)
 
+    # Проверка на дублирующихся игроков
+    card_ids = [int(v) for v in slots.values() if v is not None]
+    if len(card_ids) != len(set(card_ids)):
+        return web.json_response({"error": "duplicate players in lineup"}, status=400)
+
     async with AsyncSessionLocal() as session:
         squad = await session.get(UserSquad, int(user_id))
         if squad:

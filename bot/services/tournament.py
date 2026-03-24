@@ -315,15 +315,25 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             await bot.send_message(settings.group_id, summary)
 
         # MVP матча — взвешенный рандом с учётом г+п и оценки LLM
-        # Вес = (г*3 + п*2 + 1) * random(0.5, 2.0) * llm_factor
+        # Вес = (г*3 + п*2 + 1) * random(0.5, 2.0) * llm_factor * win_factor * ga_bonus
         # llm_factor = llm_score (1.0–3.0), если LLM не оценил — 1.5 (нейтрально)
+        # win_factor = 1.3 для игроков победившей команды
+        # ga_bonus = 1.5 если у игрока 3+ голевых действий (г+п)
+        winning_user_id: int | None = None
+        if result.home_goals > result.away_goals:
+            winning_user_id = match.home_user_id
+        elif result.away_goals > result.home_goals:
+            winning_user_id = match.away_user_id
+
         mvp_text = None
         if all_match_stats:
             def _mvp_weight(s: MatchStat) -> float:
                 base = (s.goals * 3 + s.assists * 2 + 1) * _random.uniform(0.5, 2.0)
                 llm_factor = llm_scores.get(s.user_card_id, 1.5)  # 1.5 = нейтрально
                 llm_factor = max(1.0, min(3.0, llm_factor))  # зажимаем 1.0–3.0
-                return base * llm_factor
+                win_factor = 1.3 if (winning_user_id is not None and s.user_id == winning_user_id) else 1.0
+                ga_bonus = 1.5 if (s.goals + s.assists) >= 3 else 1.0
+                return base * llm_factor * win_factor * ga_bonus
 
             weights = [_mvp_weight(s) for s in all_match_stats]
             mvp_row = _random.choices(all_match_stats, weights=weights, k=1)[0]
@@ -353,12 +363,18 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
 
 
 async def _get_tournament_mvp_text(session: AsyncSession, tournament_id: int, wl_map: dict) -> str | None:
-    """Возвращает текст с MVP турнира — игрок с макс г+п за турнир."""
+    """Возвращает текст с MVP турнира — игрок с наибольшим кол-вом MVP-матчей за турнир.
+    Тай-брейкер 1: место команды в таблице турнира (выше = лучше).
+    Тай-брейкер 2: рандом.
+    """
+    import random as _rnd
+
     result = await session.execute(
         select(
             MatchStat.user_id,
             MatchStat.player_id,
             Player.name,
+            func.sum(MatchStat.mvp_count).label("mvp"),
             func.sum(MatchStat.goals).label("g"),
             func.sum(MatchStat.assists).label("a"),
         )
@@ -366,14 +382,42 @@ async def _get_tournament_mvp_text(session: AsyncSession, tournament_id: int, wl
         .join(Match, MatchStat.match_id == Match.id)
         .where(Match.tournament_id == tournament_id)
         .group_by(MatchStat.user_id, MatchStat.player_id, Player.name)
-        .order_by((func.sum(MatchStat.goals) + func.sum(MatchStat.assists)).desc())
-        .limit(1)
+        .order_by(func.sum(MatchStat.mvp_count).desc())
     )
-    row = result.first()
-    if not row or (row.g + row.a) == 0:
+    rows = result.all()
+    if not rows or rows[0].mvp == 0:
         return None
+
+    # Берём всех с максимальным кол-вом MVP
+    max_mvp = rows[0].mvp
+    candidates = [r for r in rows if r.mvp == max_mvp]
+
+    if len(candidates) == 1:
+        row = candidates[0]
+    else:
+        # Тай-брейкер: по месту команды в таблице (строим standings)
+        matches_res = await session.execute(
+            select(Match).where(
+                Match.tournament_id == tournament_id,
+                Match.home_goals.isnot(None),
+            )
+        )
+        matches = matches_res.scalars().all()
+        pts_map: dict[int, int] = {}
+        for m in matches:
+            for uid, gf, ga in [(m.home_user_id, m.home_goals, m.away_goals),
+                                 (m.away_user_id, m.away_goals, m.home_goals)]:
+                pts = 3 if gf > ga else (1 if gf == ga else 0)
+                pts_map[uid] = pts_map.get(uid, 0) + pts
+
+        # Сортируем кандидатов: больше очков = лучше
+        candidates_sorted = sorted(candidates, key=lambda r: pts_map.get(r.user_id, 0), reverse=True)
+        best_pts = pts_map.get(candidates_sorted[0].user_id, 0)
+        top = [r for r in candidates_sorted if pts_map.get(r.user_id, 0) == best_pts]
+        row = _rnd.choice(top)
+
     owner = wl_map.get(row.user_id, f"ID{row.user_id}")
-    stat_str = f"⚽{row.g}" + (f" 🎯{row.a}" if row.a else "")
+    stat_str = f"🏅{row.mvp} MVP" + (f" ⚽{row.g}" if row.g else "") + (f" 🎯{row.a}" if row.a else "")
     return f"🏆 <b>MVP турнира:</b> {row.name} (@{owner}) — {stat_str}"
 
 
