@@ -95,17 +95,18 @@ async def cmd_givepak(message: Message) -> None:
         await message.reply("user_id должен быть числом.")
         return
 
-    valid_types = {"weekly", "special", "russia", "brazil", "turkey", "minirandom", "morning"}
+    valid_types = {"weekly", "special", "russia", "brazil", "turkey", "minirandom", "morning", "saudi"}
     pack_type = parts[2] if len(parts) > 2 and parts[2] in valid_types else "weekly"
 
     if pack_type == "minirandom":
         import random as _random
-        pack_type = _random.choice(["russia", "brazil", "turkey"])
+        pack_type = _random.choice(["russia", "brazil", "turkey", "saudi"])
 
     pack_names = {
         "weekly": "еженедельный", "special": "специальный",
         "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция",
         "morning": "🌅 утренний",
+        "saudi": "🇸🇦 Саудовская лига",
     }
 
     async with AsyncSessionLocal() as session:

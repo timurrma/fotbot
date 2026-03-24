@@ -46,6 +46,10 @@ PACK_WEIGHTS = {
         "ranges": [(50, 69), (70, 75), (76, 80), (81, 99)],
         "weights": [85, 10, 4.5, 0.5],
     },
+    "saudi": {
+        "ranges": [(65, 74), (75, 78), (79, 99)],
+        "weights": [68, 25, 7],
+    },
 }
 
 # Позиции по схеме 4-4-2 для стартового пака
@@ -145,6 +149,8 @@ async def open_pack(
         players_out = await _open_turkey_pack(session, used_player_ids)
     elif pack_type == "morning":
         players_out = await _open_morning_pack(session, used_player_ids)
+    elif pack_type == "saudi":
+        players_out = await _open_saudi_pack(session, used_player_ids)
     else:
         count = 5
         # weekly / special
@@ -322,6 +328,40 @@ async def _open_morning_pack(
     return players_out
 
 
+SAUDI_CLUBS = {
+    'Al Nassr', 'Al Hilal', 'Al Ittihad', 'Al Ahli', 'Al Qadsiah',
+    'Al Ettifaq', 'Al Shabab', 'Al Fateh', 'Al Taawoun', 'Al Wehda',
+    'Al Kholood', 'Al Fayha', 'Al Riyadh', 'Damac', 'Al Orobah',
+}
+
+
+async def _open_saudi_pack(
+    session: AsyncSession,
+    used_ids: set[int],
+) -> list[Player]:
+    """Саудовская лига: 1 игрок из клубов Saudi Pro League."""
+    cfg = PACK_WEIGHTS["saudi"]
+    r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
+    query = select(Player).where(
+        Player.club.in_(SAUDI_CLUBS),
+        Player.overall_rating >= r_min,
+        Player.overall_rating <= r_max,
+        Player.id.notin_(used_ids) if used_ids else True,
+    )
+    result = await session.execute(query)
+    players = result.scalars().all()
+    if not players:
+        query2 = select(Player).where(
+            Player.club.in_(SAUDI_CLUBS),
+            Player.id.notin_(used_ids) if used_ids else True,
+        )
+        result2 = await session.execute(query2)
+        players = result2.scalars().all()
+    if not players:
+        return []
+    return [random.choice(players)]
+
+
 async def give_pending_pack(session: AsyncSession, user_id: int, pack_type: str = "weekly") -> None:
     """Добавляет неоткрытый пак в очередь игрока."""
     pack = PendingPack(user_id=user_id, pack_type=pack_type)
@@ -367,7 +407,7 @@ async def has_starter_pack(session: AsyncSession, user_id: int) -> bool:
 
 def format_pack_announcement(username: str, players: list[Player], pack_type: str = "weekly") -> str:
     """Формирует текстовый анонс открытия пака (без фото)."""
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний", "saudi": "🇸🇦 Саудовская лига"}
     header = stars.get(pack_type, "🎴")
 
     lines = [f"{header} @{username} открыл пак!\n"]
@@ -393,7 +433,7 @@ async def send_pack_with_photos(
     """
     from aiogram.types import InputMediaPhoto
 
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний", "saudi": "🇸🇦 Саудовская лига"}
     header = stars.get(pack_type, "🎴")
 
     # Берём только игроков с фото (макс 10 для медиагруппы)
