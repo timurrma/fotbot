@@ -52,7 +52,7 @@ PACK_WEIGHTS = {
     },
     "record": {
         "ranges": [(65, 74), (75, 84), (85, 99)],
-        "weights": [75, 20, 5],
+        "weights": [20, 75, 5],
     },
 }
 
