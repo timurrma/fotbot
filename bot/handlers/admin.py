@@ -12,6 +12,7 @@ from bot.services.packs import give_pending_pack
 router = Router()
 
 _match_running = False  # защита от двойного запуска
+_processed_updates: set[int] = set()  # дедупликация апдейтов
 
 
 def is_admin(user_id: int) -> bool:
@@ -85,6 +86,11 @@ async def cmd_givepak(message: Message) -> None:
     """Выдать специальный пак игроку вручную. /givepak @username или /givepak user_id [special]"""
     if not is_admin(message.from_user.id):
         return
+    if message.message_id in _processed_updates:
+        return
+    _processed_updates.add(message.message_id)
+    if len(_processed_updates) > 1000:
+        _processed_updates.clear()
 
     parts = message.text.split()
     if len(parts) < 2:
