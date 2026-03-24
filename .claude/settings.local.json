@@ -34,7 +34,8 @@
       "Bash(railway run python -c \":*)",
       "Bash(railway run:*)",
       "Bash(psql \"postgresql://postgres:xDzWGvMEdLELWzecMPnzxpbSJNptUhZE@caboose.proxy.rlwy.net:44501/railway\" -c \"SELECT user_id, username FROM whitelist;\")",
-      "Bash(psql \"postgresql://postgres:xDzWGvMEdLELWzecMPnzxpbSJNptUhZE@caboose.proxy.rlwy.net:44501/railway\" -c \"\\\\d tournaments\")"
+      "Bash(psql \"postgresql://postgres:xDzWGvMEdLELWzecMPnzxpbSJNptUhZE@caboose.proxy.rlwy.net:44501/railway\" -c \"\\\\d tournaments\")",
+      "Bash(python3 -c \"from bot.services.tournament import play_next_match; print\\(''OK''\\)\")"
     ]
   }
 }

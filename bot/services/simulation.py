@@ -372,6 +372,31 @@ def generate_events(
                 team=team,
             ))
 
+    # Двойная жёлтая = красная (8% шанс, независимо от прямой красной)
+    if random.random() < 0.08:
+        team = random.choice(["home", "away"])
+        lineup = home_lineup if team == "home" else away_lineup
+        player_slot = random.choice(lineup) if lineup else None
+        if player_slot:
+            yellow1_min = pick_minute(5, 75)
+            gap = random.randint(5, 30)
+            yellow2_min = min(90, yellow1_min + gap)
+            while yellow2_min in used_minutes:
+                yellow2_min = min(90, yellow2_min + 1)
+            used_minutes.add(yellow2_min)
+            events.append(MatchEvent(
+                minute=yellow1_min,
+                event_type="yellow_card",
+                scorer_slot=player_slot,
+                team=team,
+            ))
+            events.append(MatchEvent(
+                minute=yellow2_min,
+                event_type="double_yellow",
+                scorer_slot=player_slot,
+                team=team,
+            ))
+
     # Промахи/моменты (1-3 штуки)
     for _ in range(random.randint(1, 3)):
         team = random.choice(["home", "away"])

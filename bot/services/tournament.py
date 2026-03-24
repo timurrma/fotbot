@@ -166,18 +166,21 @@ def _format_lineups(
     away_name: str,
     away_formation: str,
     away_cards: list,
+    home_slot_pos: list | None = None,
+    away_slot_pos: list | None = None,
 ) -> str:
     """Форматирует составы двух команд перед матчем."""
-    def lineup_lines(name: str, formation: str, cards: list) -> list[str]:
+    def lineup_lines(name: str, formation: str, cards: list, slot_pos: list | None) -> list[str]:
         lines = [f"<b>{name}</b> ({formation})"]
-        for _, player in cards[:11]:
+        for i, (_, player) in enumerate(cards[:11]):
             r = player.overall_rating
             icon = "👑" if r >= 90 else "🌟" if r >= 85 else "⭐"
-            lines.append(f"  {player.position} {player.name} {r}{icon}")
+            pos = slot_pos[i] if slot_pos and i < len(slot_pos) else player.position
+            lines.append(f"  {pos} {player.name} {r}{icon}")
         return lines
 
-    home_lines = lineup_lines(home_name, home_formation, home_cards)
-    away_lines = lineup_lines(away_name, away_formation, away_cards)
+    home_lines = lineup_lines(home_name, home_formation, home_cards, home_slot_pos)
+    away_lines = lineup_lines(away_name, away_formation, away_cards, away_slot_pos)
 
     return (
         "📋 <b>Составы</b>\n\n"
@@ -284,6 +287,7 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         lineup_text = _format_lineups(
             home_name, home_formation, home_cards,
             away_name, away_formation, away_cards,
+            home_slot_pos, away_slot_pos,
         )
 
         llm_scores: dict = {}
