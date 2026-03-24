@@ -95,7 +95,7 @@ async def cmd_givepak(message: Message) -> None:
         await message.reply("user_id должен быть числом.")
         return
 
-    valid_types = {"weekly", "special", "russia", "brazil", "turkey", "minirandom"}
+    valid_types = {"weekly", "special", "russia", "brazil", "turkey", "minirandom", "morning"}
     pack_type = parts[2] if len(parts) > 2 and parts[2] in valid_types else "weekly"
 
     if pack_type == "minirandom":
@@ -105,6 +105,7 @@ async def cmd_givepak(message: Message) -> None:
     pack_names = {
         "weekly": "еженедельный", "special": "специальный",
         "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция",
+        "morning": "🌅 утренний",
     }
 
     async with AsyncSessionLocal() as session:
@@ -118,7 +119,7 @@ async def cmd_givepak(message: Message) -> None:
     except Exception:
         pass
 
-    await message.reply(f"✅ Пак «{pack_names[pack_type]}» добавлен в очередь игрока ID{target_id}.\n\nДоступные типы: weekly, special, russia, brazil, turkey, minirandom")
+    await message.reply(f"✅ Пак «{pack_names[pack_type]}» добавлен в очередь игрока ID{target_id}.\n\nДоступные типы: weekly, special, russia, brazil, turkey, minirandom, morning")
 
 
 @router.message(Command("starttournament"))

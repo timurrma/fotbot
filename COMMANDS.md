@@ -4,14 +4,15 @@
 
 Синтаксис: `/givepak <user_id> [тип]`
 
-Типы: `weekly` (по умолч.), `special`, `russia`, `brazil`, `turkey`, `minirandom`
+Типы: `weekly` (по умолч.), `special`, `russia`, `brazil`, `turkey`, `minirandom`, `morning`
 
 - `weekly` — 5 карточек, обычный
-- `special` — 5 карточек, повышенный шанс 85+
+- `special` — 5 карточек, повышенный шанс 80+
 - `russia` — 1 русский игрок (1% Аршавин)
 - `brazil` — 2 бразильца
 - `turkey` — 1 турок
 - `minirandom` — рандомно один из: russia / brazil / turkey
+- `morning` — 2 карточки, ежедневный утренний пак (<70: 85%, 70-75: 10%, 76-80: 4.5%, 80+: 0.5%)
 
 ### Всем игрокам — обычный пак (weekly)
 ```
@@ -20,7 +21,7 @@
 /givepak 560101647
 ```
 
-### Всем игрокам — специальный пак (85+ чаще)
+### Всем игрокам — специальный пак (80+ чаще)
 ```
 /givepak 308826725 special
 /givepak 316877089 special
@@ -53,6 +54,13 @@
 /givepak 308826725 minirandom
 /givepak 316877089 minirandom
 /givepak 560101647 minirandom
+```
+
+### Всем игрокам — утренний пак
+```
+/givepak 308826725 morning
+/givepak 316877089 morning
+/givepak 560101647 morning
 ```
 
 ### Конкретному игроку
