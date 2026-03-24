@@ -328,11 +328,7 @@ async def _open_morning_pack(
     return players_out
 
 
-SAUDI_CLUBS = {
-    'Al Nassr', 'Al Hilal', 'Al Ittihad', 'Al Ahli', 'Al Qadsiah',
-    'Al Ettifaq', 'Al Shabab', 'Al Fateh', 'Al Taawoun', 'Al Wehda',
-    'Al Kholood', 'Al Fayha', 'Al Riyadh', 'Damac', 'Al Orobah',
-}
+SAUDI_CLUBS = {'Al Nassr', 'Al Hilal', 'Al Ittihad'}
 
 
 async def _open_saudi_pack(

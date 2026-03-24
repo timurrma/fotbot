@@ -11,6 +11,8 @@ from bot.services.packs import give_pending_pack
 
 router = Router()
 
+_match_running = False  # защита от двойного запуска
+
 
 def is_admin(user_id: int) -> bool:
     return user_id == settings.admin_id
@@ -166,7 +168,23 @@ async def cmd_nextmatch(message: Message) -> None:
         await message.reply("❌ Нет активного турнира. Запустите турнир командой /starttournament.")
         return
 
+    global _match_running
+    if _match_running:
+        await message.reply("⏳ Матч уже запущен, подожди...")
+        return
+
+    _match_running = True
     await message.reply("⚽ Запускаю следующий матч...")
-    played = await play_next_match(message.bot, with_commentary=True)
+    import asyncio
+    try:
+        played = await asyncio.wait_for(play_next_match(message.bot, with_commentary=True), timeout=300)
+    except asyncio.TimeoutError:
+        await message.reply("⚠️ Матч завис (таймаут 5 мин). Попробуй ещё раз.")
+        return
+    except Exception as e:
+        await message.reply(f"❌ Ошибка при симуляции: {e}")
+        return
+    finally:
+        _match_running = False
     if not played:
         await message.reply("Все матчи этой недели уже сыграны!")
