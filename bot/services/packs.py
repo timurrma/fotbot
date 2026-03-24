@@ -31,16 +31,16 @@ PACK_WEIGHTS = {
         "weights": [90, 10, 0],
     },
     "russia": {
-        "ranges": [(65, 74), (75, 84), (85, 99)],
-        "weights": [55, 35, 10],
+        "ranges": [(65, 74), (75, 78), (79, 99)],
+        "weights": [68, 25, 7],
     },
     "brazil": {
         "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
-        "weights": [55, 30, 13, 2],
+        "weights": [68, 20, 7, 2],
     },
     "turkey": {
         "ranges": [(65, 74), (75, 78), (79, 99)],
-        "weights": [55, 35, 10],
+        "weights": [68, 25, 7],
     },
     "morning": {
         "ranges": [(50, 69), (70, 75), (76, 80), (81, 99)],
@@ -219,9 +219,9 @@ async def _open_russia_pack(
         if arshavin:
             return [arshavin]
 
-    # Диапазоны: 65-74 (55%), 75-78 (35%), 79+ (10%), исключая Аршавина
+    # Диапазоны: 65-74 (68%), 75-78 (25%), 79+ (7%), исключая Аршавина
     ranges = [(65, 74), (75, 78), (79, 99)]
-    weights = [55, 35, 10]
+    weights = [68, 25, 7]
     r_min, r_max = random.choices(ranges, weights=weights, k=1)[0]
 
     exclude = used_ids | {ARSHAVIN_ID}
