@@ -698,6 +698,19 @@ async function saveSquad() {
     showToast(`⚠️ Не заполнено слотов: ${emptySlots.length} (${emptySlots.join(', ')})`, 3500);
   }
 
+  // Проверка дублей — один и тот же игрок (player_id) не может стоять дважды
+  const playerIdCount = {};
+  for (const [slot, cardId] of Object.entries(squad)) {
+    const card = cards.find(c => c.id === cardId);
+    if (!card) continue;
+    const pid = card.player_id;
+    if (playerIdCount[pid]) {
+      showToast(`❌ ${card.name} стоит на двух позициях — убери дубль`, 4000);
+      return;
+    }
+    playerIdCount[pid] = true;
+  }
+
   const btn = document.getElementById('saveBtn');
   btn.disabled = true;
   btn.textContent = '...';
@@ -1143,7 +1156,7 @@ async function selectOpponent(uid) {
 
 function renderOpponentPitch(data) {
   const formation = data.formation || '4-4-2';
-  const rows = FORMATIONS[formation] || FORMATIONS['4-4-2'];
+  const rows = [...(FORMATIONS[formation] || FORMATIONS['4-4-2'])].reverse();
   // slot -> player map
   const slotMap = {};
   (data.slots || []).forEach(s => { slotMap[s.slot] = s.player; });
