@@ -134,6 +134,7 @@ async def get_cards(request: web.Request) -> web.Response:
             "rating": c.player.overall_rating,
             "photo": c.player.photo_url,
             "national": c.player.is_national_team,
+            "nationality": c.player.nationality,
         }
         for c in cards
     ]

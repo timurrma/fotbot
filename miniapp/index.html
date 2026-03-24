@@ -862,6 +862,26 @@ function shortName(name) {
   return parts[parts.length - 1]; // last name
 }
 
+const NATIONALITY_FLAGS = {
+  'Russia': '🇷🇺', 'Brazil': '🇧🇷', 'Türkiye': '🇹🇷', 'Turkey': '🇹🇷',
+  'France': '🇫🇷', 'Germany': '🇩🇪', 'Spain': '🇪🇸', 'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'Portugal': '🇵🇹', 'Argentina': '🇦🇷', 'Italy': '🇮🇹', 'Netherlands': '🇳🇱',
+  'Belgium': '🇧🇪', 'Croatia': '🇭🇷', 'Uruguay': '🇺🇾', 'Colombia': '🇨🇴',
+  'Mexico': '🇲🇽', 'United States': '🇺🇸', 'Poland': '🇵🇱', 'Denmark': '🇩🇰',
+  'Sweden': '🇸🇪', 'Norway': '🇳🇴', 'Switzerland': '🇨🇭', 'Austria': '🇦🇹',
+  'Czech Republic': '🇨🇿', 'Slovakia': '🇸🇰', 'Hungary': '🇭🇺', 'Romania': '🇷🇴',
+  'Serbia': '🇷🇸', 'Ukraine': '🇺🇦', 'Wales': '🏴󠁧󠁢󠁷󠁬󠁳󠁿', 'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿',
+  'Republic of Ireland': '🇮🇪', 'Greece': '🇬🇷', 'Morocco': '🇲🇦', 'Senegal': '🇸🇳',
+  'Nigeria': '🇳🇬', 'Egypt': '🇪🇬', 'Cameroon': '🇨🇲', 'Ghana': '🇬🇭',
+  'Japan': '🇯🇵', 'South Korea': '🇰🇷', 'Australia': '🇦🇺', 'Canada': '🇨🇦',
+  'Ecuador': '🇪🇨', 'Chile': '🇨🇱', 'Paraguay': '🇵🇾', 'Bolivia': '🇧🇴',
+  'Venezuela': '🇻🇪', 'Peru': '🇵🇪', 'Iran': '🇮🇷', 'Saudi Arabia': '🇸🇦',
+  'Algeria': '🇩🇿', 'Tunisia': '🇹🇳', 'Ivory Coast': '🇨🇮', 'Mali': '🇲🇱',
+};
+function nationalityFlag(nationality) {
+  return NATIONALITY_FLAGS[nationality] || '';
+}
+
 function selectSlot(slotName) {
   // Если уже выбрана карточка — назначаем её на этот слот
   if (selectedCard) {
@@ -973,7 +993,8 @@ function makeCardEl(card, inSquad, isSelected) {
   info.className = 'player-info';
   const name = document.createElement('div');
   name.className = 'player-name';
-  name.textContent = card.name;
+  const flag = nationalityFlag(card.nationality);
+  name.textContent = (flag ? flag + ' ' : '') + card.name;
   const meta = document.createElement('div');
   meta.className = 'player-meta';
   meta.textContent = `${card.position} · ${card.club || ''}`;
@@ -1273,7 +1294,8 @@ function openListModal() {
     const row = document.createElement('div');
     row.className = 'player-card';
     row.style.margin = '0 0 6px';
-    row.innerHTML = `<div class="player-info"><div class="player-name">${c.name}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
+    const cf = nationalityFlag(c.nationality);
+    row.innerHTML = `<div class="player-info"><div class="player-name">${cf ? cf + ' ' : ''}${c.name}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
     row.onclick = async () => {
       closeModal();
       await listCard(c.id);
@@ -1290,7 +1312,8 @@ function openOfferModal(listingId, wantCardId, wantCardName) {
     const row = document.createElement('div');
     row.className = 'player-card';
     row.style.margin = '0 0 6px';
-    row.innerHTML = `<div class="player-info"><div class="player-name">${c.name}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
+    const cf = nationalityFlag(c.nationality);
+    row.innerHTML = `<div class="player-info"><div class="player-name">${cf ? cf + ' ' : ''}${c.name}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
     row.onclick = async () => {
       closeModal();
       await makeOffer(listingId, c.id);
