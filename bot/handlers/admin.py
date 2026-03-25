@@ -96,11 +96,11 @@ PACK_MENU = [
 PACK_HELP_TEXT = "📦 <b>Типы паков:</b>\n\n" + "\n".join(
     f"<b>{i+1}.</b> {name} — {desc}"
     for i, (_, name, desc) in enumerate(PACK_MENU)
-) + "\n\n<i>Выдать пак: /givepak @username &lt;номер&gt;</i>"
+) + "\n\n<i>Выдать пак: /givepack @username &lt;номер&gt;</i>"
 
 
-@router.message(Command("givepak"))
-async def cmd_givepak(message: Message) -> None:
+@router.message(Command("givepack"))
+async def cmd_givepack(message: Message) -> None:
     """Без аргументов — показывает список паков. С аргументами (@username номер) — выдаёт пак."""
     if not is_admin(message.from_user.id):
         return
@@ -117,7 +117,7 @@ async def cmd_givepak(message: Message) -> None:
         await message.reply(PACK_HELP_TEXT, parse_mode="HTML")
         return
 
-    # Нужно минимум: /givepak @username <номер>
+    # Нужно минимум: /givepack @username <номер>
     if len(parts) < 3:
         await message.reply(PACK_HELP_TEXT, parse_mode="HTML")
         return

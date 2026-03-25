@@ -1,9 +1,9 @@
 # Команды админа
 
-## /givepak — выдать пак игроку
+## /givepack — выдать пак игроку
 
-`/givepak` — показать список паков с нумерацией
-`/givepak @username <номер>` — выдать пак игроку
+`/givepack` — показать список паков с нумерацией
+`/givepack @username <номер>` — выдать пак игроку
 
 | № | Тип | Описание |
 |---|-----|----------|
@@ -19,14 +19,14 @@
 
 ### Примеры — всем игрокам обычный пак (1)
 ```
-/givepak @timurRRMa 1
-/givepak @Djavaded 1
-/givepak @RRabb1dtt 1
+/givepack @timurRRMa 1
+/givepack @Djavaded 1
+/givepack @RRabb1dtt 1
 ```
 
 ### Специальный пак (2)
 ```
-/givepak @timurRRMa 2
-/givepak @Djavaded 2
-/givepak @RRabb1dtt 2
+/givepack @timurRRMa 2
+/givepack @Djavaded 2
+/givepack @RRabb1dtt 2
 ```
