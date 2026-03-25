@@ -48,10 +48,6 @@ async def create_transfer_offer(
     Создаёт предложение обмена.
     Возвращает (success, message).
     """
-    remaining = await get_remaining_transfers(session, from_user_id)
-    if remaining <= 0:
-        return False, "У тебя закончились трансферы на эту неделю (лимит 3)."
-
     # Проверяем принадлежность карточек
     offer_card = await session.get(UserCard, offer_card_id)
     want_card = await session.get(UserCard, want_card_id)
