@@ -266,6 +266,13 @@ def generate_events(
     home_stats: dict[int, dict] = {}
     away_stats: dict[int, dict] = {}
     used_minutes: set[int] = set()
+    # Удалённые игроки (исключаются из дальнейших событий)
+    home_red_cards: set[int] = set()  # user_card_id
+    away_red_cards: set[int] = set()
+
+    def active_lineup(lineup: list[PlayerSlot], red_set: set[int]) -> list[PlayerSlot]:
+        active = [s for s in lineup if s.user_card_id not in red_set]
+        return active if active else lineup  # fallback если все удалены
 
     def pick_minute(lo: int = 1, hi: int = 90) -> int:
         if lo > hi:
@@ -288,6 +295,10 @@ def generate_events(
         if player_slot:
             red_minute = pick_minute(5, 85)
             red_team = team
+            if team == "home":
+                home_red_cards.add(player_slot.user_card_id)
+            else:
+                away_red_cards.add(player_slot.user_card_id)
             events.append(MatchEvent(
                 minute=red_minute,
                 event_type="red_card",
@@ -319,7 +330,8 @@ def generate_events(
 
         phase2 = _generate_goals_for_phase(
             h_lam2, a_lam2,
-            home_lineup, away_lineup,
+            active_lineup(home_lineup, home_red_cards),
+            active_lineup(away_lineup, away_red_cards),
             home_stats, away_stats,
             used_minutes,
             minute_lo=min(90, red_minute + 1), minute_hi=90,
@@ -361,7 +373,8 @@ def generate_events(
     # Жёлтые карточки (1-3 штуки)
     for _ in range(random.randint(1, 3)):
         team = random.choice(["home", "away"])
-        lineup = home_lineup if team == "home" else away_lineup
+        red_set = home_red_cards if team == "home" else away_red_cards
+        lineup = active_lineup(home_lineup if team == "home" else away_lineup, red_set)
         player_slot = random.choice(lineup) if lineup else None
         if player_slot:
             events.append(MatchEvent(
@@ -374,7 +387,8 @@ def generate_events(
     # Двойная жёлтая = красная (8% шанс, независимо от прямой красной)
     if random.random() < 0.08:
         team = random.choice(["home", "away"])
-        lineup = home_lineup if team == "home" else away_lineup
+        red_set = home_red_cards if team == "home" else away_red_cards
+        lineup = active_lineup(home_lineup if team == "home" else away_lineup, red_set)
         player_slot = random.choice(lineup) if lineup else None
         if player_slot:
             yellow1_min = pick_minute(5, 75)
@@ -383,6 +397,11 @@ def generate_events(
             while yellow2_min in used_minutes:
                 yellow2_min = min(90, yellow2_min + 1)
             used_minutes.add(yellow2_min)
+            # Добавляем в удалённые
+            if team == "home":
+                home_red_cards.add(player_slot.user_card_id)
+            else:
+                away_red_cards.add(player_slot.user_card_id)
             events.append(MatchEvent(
                 minute=yellow1_min,
                 event_type="yellow_card",
@@ -399,7 +418,8 @@ def generate_events(
     # Промахи/моменты (1-3 штуки)
     for _ in range(random.randint(1, 3)):
         team = random.choice(["home", "away"])
-        lineup = home_lineup if team == "home" else away_lineup
+        red_set = home_red_cards if team == "home" else away_red_cards
+        lineup = active_lineup(home_lineup if team == "home" else away_lineup, red_set)
         player_slot = _pick_by_prob(lineup, GOAL_PROBS) if lineup else None
         if player_slot:
             events.append(MatchEvent(
