@@ -839,7 +839,7 @@ function makeSlotEl(slotName) {
       const img = document.createElement('img');
       img.src = photoUrl(card.photo);
       const isTransfermarkt = card.photo && card.photo.includes('transfermarkt');
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;' + (isTransfermarkt ? 'object-position:top center;' : '');
+      img.style.cssText = 'width:100%;height:100%;border-radius:50%;' + (isTransfermarkt ? 'object-fit:contain;object-position:center;' : 'object-fit:cover;');
       img.onerror = () => { photoWrap.textContent = '👤'; };
       photoWrap.appendChild(img);
     } else {
@@ -1220,7 +1220,7 @@ function renderOpponentPitch(data) {
         const tierBg = eff >= 90 ? 'rgba(239,68,68,0.2)' : eff >= 85 ? 'rgba(167,139,250,0.25)' : eff >= 80 ? 'rgba(244,162,97,0.25)' : 'rgba(255,255,255,0.1)';
         const tierShadow = eff >= 90 ? 'box-shadow:0 0 10px rgba(239,68,68,0.8);' : '';
         const photo = p.photo
-          ? `<img src="${API_BASE}/api/photo?url=${encodeURIComponent(p.photo)}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;${p.photo.includes('transfermarkt') ? 'object-position:top center;' : ''}display:block;margin:0 auto 2px;border:${tierBorder};">`
+          ? `<img src="${API_BASE}/api/photo?url=${encodeURIComponent(p.photo)}" style="width:36px;height:36px;border-radius:50%;${p.photo.includes('transfermarkt') ? 'object-fit:contain;' : 'object-fit:cover;'}display:block;margin:0 auto 2px;border:${tierBorder};">`
           : `<div style="width:36px;height:36px;border-radius:50%;background:${tierBg};display:flex;align-items:center;justify-content:center;font-size:14px;margin:0 auto 2px;border:${tierBorder};${tierShadow}">👤</div>`;
         html += `<div style="text-align:center;min-width:52px;max-width:60px;">
           ${photo}
