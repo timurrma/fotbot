@@ -1031,7 +1031,7 @@ function makeCardEl(card, inSquad, isSelected) {
   photoEl.className = 'player-photo';
   if (card.photo) {
     const img = document.createElement('img');
-    img.src = card.photo;
+    img.src = photoUrl(card.photo);
     img.onerror = () => { img.parentElement.textContent = '👤'; };
     photoEl.appendChild(img);
   } else {
