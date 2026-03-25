@@ -322,11 +322,11 @@ def generate_events(
         scale = remaining / 90  # чем позже красная — тем меньше эффект
 
         if red_team == "home":
-            h_lam2 = h_lam * (1 - 0.4 * scale)   # home теряет до 40% угрозы
-            a_lam2 = a_lam * (1 + 0.3 * scale)    # away получает до 30% бонуса
+            h_lam2 = h_lam * (1 - 0.5 * scale)   # home теряет до 50% угрозы
+            a_lam2 = a_lam * (1 + 0.4 * scale)    # away получает до 40% бонуса
         else:
-            a_lam2 = a_lam * (1 - 0.4 * scale)
-            h_lam2 = h_lam * (1 + 0.3 * scale)
+            a_lam2 = a_lam * (1 - 0.5 * scale)
+            h_lam2 = h_lam * (1 + 0.4 * scale)
 
         phase2 = _generate_goals_for_phase(
             h_lam2, a_lam2,
