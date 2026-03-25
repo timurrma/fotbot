@@ -658,6 +658,7 @@ async function loadCards() {
     if (!Array.isArray(cards)) cards = [];
     // Sort by rating desc
     cards.sort((a, b) => b.rating - a.rating);
+    _dupNumbers = null; // сбрасываем кэш дублей
   } catch(e) {
     showToast('❌ Ошибка загрузки карточек');
   }
@@ -984,6 +985,26 @@ function renderPlayerList() {
   }
 }
 
+// Предвычисляем порядковые номера дублей: {card.id -> номер (1-based, 1 = оригинал)}
+function computeDuplicateNumbers() {
+  const groups = {};
+  for (const c of cards) {
+    if (!groups[c.player_id]) groups[c.player_id] = [];
+    groups[c.player_id].push(c);
+  }
+  const result = {};
+  for (const group of Object.values(groups)) {
+    group.sort((a, b) => a.id - b.id); // старше = меньший id
+    group.forEach((c, i) => { result[c.id] = i + 1; });
+  }
+  return result;
+}
+let _dupNumbers = null;
+function getDupNumber(cardId) {
+  if (!_dupNumbers) _dupNumbers = computeDuplicateNumbers();
+  return _dupNumbers[cardId] || 1;
+}
+
 function makeCardEl(card, inSquad, isSelected) {
   const el = document.createElement('div');
   el.className = 'player-card' + (inSquad ? ' in-squad' : '') + (isSelected ? ' selected' : '');
@@ -1007,7 +1028,9 @@ function makeCardEl(card, inSquad, isSelected) {
   const name = document.createElement('div');
   name.className = 'player-name';
   const flag = nationalityFlag(card.nationality);
-  name.textContent = (flag ? flag + ' ' : '') + card.name;
+  const dupNum = getDupNumber(card.id);
+  const dupSuffix = dupNum > 1 ? ` <span style="font-size:10px;color:#94a3b8;font-weight:500;">#${dupNum}</span>` : '';
+  name.innerHTML = (flag ? flag + ' ' : '') + card.name + dupSuffix;
   const meta = document.createElement('div');
   meta.className = 'player-meta';
   meta.textContent = `${card.position} · ${card.club || ''}`;
