@@ -451,6 +451,24 @@ async def post_cancel_offer(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+async def post_decline_offer(request: web.Request) -> web.Response:
+    """POST /api/market/decline-offer — отклонить чужой оффер. {user_id, offer_id}"""
+    body = await request.json()
+    user_id = int(body.get("user_id", 0))
+    offer_id = int(body.get("offer_id", 0))
+
+    async with AsyncSessionLocal() as session:
+        offer = await session.get(TransferOffer, offer_id)
+        if not offer or offer.to_user_id != user_id:
+            return web.json_response({"error": "Оффер не найден"}, status=400)
+        if offer.status != "pending":
+            return web.json_response({"error": "Оффер уже неактивен"}, status=400)
+        offer.status = "declined"
+        await session.commit()
+
+    return web.json_response({"ok": True})
+
+
 async def get_listing_offers(request: web.Request) -> web.Response:
     """GET /api/market/offers?user_id=XXX — офферы на мои листинги."""
     user_id_str = request.rel_url.query.get("user_id")
@@ -666,10 +684,11 @@ def create_api_app() -> web.Application:
     app.router.add_post("/api/market/cancel", post_cancel_listing)
     app.router.add_post("/api/market/offer", post_make_offer)
     app.router.add_post("/api/market/cancel-offer", post_cancel_offer)
+    app.router.add_post("/api/market/decline-offer", post_decline_offer)
     app.router.add_get("/api/market/offers", get_listing_offers)
     app.router.add_post("/api/market/accept", post_accept_offer)
     for path in ["/api/market/list", "/api/market/cancel", "/api/market/offer",
-                 "/api/market/cancel-offer", "/api/market/accept"]:
+                 "/api/market/cancel-offer", "/api/market/decline-offer", "/api/market/accept"]:
         app.router.add_options(path, lambda r: web.Response())
 
     # Раздаём Mini App (index.html) по корневому пути

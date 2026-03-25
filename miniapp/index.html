@@ -1463,7 +1463,7 @@ async function acceptOffer(offerId) {
 
 async function declineOffer(offerId) {
   try {
-    const r = await fetch(`${API_BASE}/api/market/cancel-offer`, {
+    const r = await fetch(`${API_BASE}/api/market/decline-offer`, {
       method: 'POST', headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ user_id: userId, offer_id: offerId }),
     });
