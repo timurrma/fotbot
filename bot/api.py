@@ -417,11 +417,6 @@ async def post_make_offer(request: web.Request) -> web.Response:
         if existing.scalar_one_or_none():
             return web.json_response({"error": "Ты уже сделал оффер на эту карточку"}, status=400)
 
-        from bot.services.transfers import get_remaining_transfers
-        remaining = await get_remaining_transfers(session, user_id)
-        if remaining <= 0:
-            return web.json_response({"error": "Лимит трансферов на неделю исчерпан (3)"}, status=400)
-
         offer = TransferOffer(
             from_user_id=user_id,
             to_user_id=listing.user_id,
