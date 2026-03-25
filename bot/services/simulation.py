@@ -337,6 +337,28 @@ def generate_events(
             minute_lo=min(90, red_minute + 1), minute_hi=90,
         )
         events.extend(phase2)
+
+        # 60% шанс на гол команде в большинстве если красная после 60-й
+        if red_minute > 60 and random.random() < 0.60:
+            bonus_team = "away" if red_team == "home" else "home"
+            bonus_lineup = active_lineup(home_lineup, home_red_cards) if bonus_team == "home" else active_lineup(away_lineup, away_red_cards)
+            bonus_stats = home_stats if bonus_team == "home" else away_stats
+            minute = random.randint(min(90, red_minute + 1), 90)
+            while minute in used_minutes:
+                minute = min(90, minute + 1)
+            used_minutes.add(minute)
+            scorer = _pick_by_prob(bonus_lineup, GOAL_PROBS)
+            assister_candidates = [s for s in bonus_lineup if s != scorer]
+            assister = _pick_by_prob(assister_candidates, ASSIST_PROBS) if random.random() < 0.7 else None
+            events.append(MatchEvent(minute=minute, event_type="goal", scorer_slot=scorer, assist_slot=assister, team=bonus_team))
+            if scorer:
+                cid = scorer.user_card_id
+                bonus_stats.setdefault(cid, {"goals": 0, "assists": 0, "player_id": scorer.player.id})
+                bonus_stats[cid]["goals"] += 1
+            if assister:
+                cid = assister.user_card_id
+                bonus_stats.setdefault(cid, {"goals": 0, "assists": 0, "player_id": assister.player.id})
+                bonus_stats[cid]["assists"] += 1
     else:
         # Нет красной — обычная генерация за весь матч
         phase = _generate_goals_for_phase(

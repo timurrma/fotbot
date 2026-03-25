@@ -197,13 +197,13 @@ async def ensure_matches_created(
     random.shuffle(pairs)
 
     if tournament.tournament_type == "mega":
-        # Каждая пара играет дважды: A дома vs B и B дома vs A
-        all_fixtures = []
-        for home_id, away_id in pairs:
-            all_fixtures.append((home_id, away_id))
-            all_fixtures.append((away_id, home_id))
-        random.shuffle(all_fixtures)
-        for home_id, away_id in all_fixtures:
+        # Круг 1: каждая пара (A дома, B в гостях) — случайный порядок
+        leg1 = [(h, a) for h, a in pairs]
+        random.shuffle(leg1)
+        # Круг 2: те же пары, но стороны поменяны (B дома, A в гостях) — отдельный случайный порядок
+        leg2 = [(a, h) for h, a in pairs]
+        random.shuffle(leg2)
+        for home_id, away_id in leg1 + leg2:
             session.add(Match(
                 tournament_id=tournament.id,
                 home_user_id=home_id,
