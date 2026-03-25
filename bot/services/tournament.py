@@ -120,6 +120,46 @@ async def get_active_tournament(session: AsyncSession) -> Tournament | None:
     return result.scalar_one_or_none()
 
 
+async def get_pending_mega_tournament(session: AsyncSession) -> Tournament | None:
+    """Возвращает ожидающий мегатурнир (pending), если есть."""
+    result = await session.execute(
+        select(Tournament).where(
+            Tournament.status == "pending",
+            Tournament.tournament_type == "mega",
+        ).order_by(Tournament.id.asc()).limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def maybe_start_pending_mega(bot, session: AsyncSession) -> bool:
+    """Если есть pending мегатурнир и нет активного — запускает его и анонсирует.
+    Возвращает True если мегатурнир был запущен.
+    """
+    active = await get_active_tournament(session)
+    if active:
+        return False
+    mega = await get_pending_mega_tournament(session)
+    if not mega:
+        return False
+    mega.status = "running"
+    await session.commit()
+    await ensure_matches_created(session, mega)
+
+    wl_result = await session.execute(select(Whitelist))
+    players = wl_result.scalars().all()
+    names = ", ".join(f"@{p.username}" if p.username else f"ID{p.user_id}" for p in players)
+    match_count = len(players) * (len(players) - 1) if len(players) > 1 else 0
+    await bot.send_message(
+        settings.group_id,
+        f"🔥 <b>МЕГАТУРНИР начался!</b>\n\n"
+        f"Каждый играет дома и в гостях — {match_count} матчей!\n"
+        f"Участники: {names}\n\n"
+        f"Запускай матчи командой /nextmatch",
+        parse_mode="HTML",
+    )
+    return True
+
+
 async def get_next_unplayed_match(
     session: AsyncSession,
     tournament: Tournament,
@@ -138,7 +178,10 @@ async def ensure_matches_created(
     session: AsyncSession,
     tournament: Tournament,
 ) -> None:
-    """Создаёт все матчи round-robin если ещё не созданы."""
+    """Создаёт все матчи турнира если ещё не созданы.
+    regular — round-robin (1 матч на пару).
+    mega — двойной round-robin (2 матча: дома и в гостях).
+    """
     result = await session.execute(
         select(Match).where(Match.tournament_id == tournament.id)
     )
@@ -152,13 +195,27 @@ async def ensure_matches_created(
 
     pairs = list(combinations(user_ids, 2))
     random.shuffle(pairs)
-    for home_id, away_id in pairs:
-        match = Match(
-            tournament_id=tournament.id,
-            home_user_id=home_id,
-            away_user_id=away_id,
-        )
-        session.add(match)
+
+    if tournament.tournament_type == "mega":
+        # Каждая пара играет дважды: A дома vs B и B дома vs A
+        all_fixtures = []
+        for home_id, away_id in pairs:
+            all_fixtures.append((home_id, away_id))
+            all_fixtures.append((away_id, home_id))
+        random.shuffle(all_fixtures)
+        for home_id, away_id in all_fixtures:
+            session.add(Match(
+                tournament_id=tournament.id,
+                home_user_id=home_id,
+                away_user_id=away_id,
+            ))
+    else:
+        for home_id, away_id in pairs:
+            session.add(Match(
+                tournament_id=tournament.id,
+                home_user_id=home_id,
+                away_user_id=away_id,
+            ))
     await session.commit()
 
 
@@ -361,10 +418,16 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
             await asyncio.sleep(3)
             # MVP турнира
             tournament_mvp_text = await _get_tournament_mvp_text(session, tournament.id, wl_map)
-            standings_msg = f"🏁 <b>Турнир недели завершён!</b>\n\n{final_standings}"
+            t_label = "🔥 МЕГАТУРНИР завершён!" if tournament.tournament_type == "mega" else "🏁 Турнир недели завершён!"
+            standings_msg = f"<b>{t_label}</b>\n\n{final_standings}"
             if tournament_mvp_text:
                 standings_msg += f"\n\n{tournament_mvp_text}"
             await bot.send_message(settings.group_id, standings_msg, parse_mode="HTML")
+
+            # Если завершился обычный турнир — проверяем есть ли ожидающий мегатурнир
+            if tournament.tournament_type == "regular":
+                await asyncio.sleep(2)
+                await maybe_start_pending_mega(bot, session)
 
         return True
 
@@ -450,10 +513,8 @@ async def auto_announce_results(bot: Bot) -> None:
         if not unplayed:
             return
 
-        await bot.send_message(
-            settings.group_id,
-            "📊 Авто-итоги матчей этой недели:"
-        )
+        t_label = "🔥 Авто-итоги МЕГАТУРНИРА:" if tournament.tournament_type == "mega" else "📊 Авто-итоги матчей этой недели:"
+        await bot.send_message(settings.group_id, t_label)
         await asyncio.sleep(1)
 
         for match in unplayed:
@@ -504,6 +565,14 @@ async def auto_announce_results(bot: Bot) -> None:
         # Все матчи сыграны — помечаем турнир завершённым
         tournament.status = "finished"
         await session.commit()
+
+        # Если это был обычный турнир — запускаем pending мегатурнир и сразу играем его матчи
+        if tournament.tournament_type == "regular":
+            await asyncio.sleep(2)
+            started = await maybe_start_pending_mega(bot, session)
+            if started:
+                await asyncio.sleep(2)
+                await auto_announce_results(bot)
 
 
 async def build_standings_text(session: AsyncSession, tournament_id: int | None = None) -> str:

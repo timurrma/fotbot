@@ -10,7 +10,24 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=As
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _run_migrations()
     await _seed_players_if_empty()
+
+
+async def _run_migrations() -> None:
+    """Применяет накопленные миграции для уже существующих таблиц."""
+    from sqlalchemy import text, inspect
+    async with engine.connect() as conn:
+        # Добавляем tournament_type если не существует
+        def _check_and_add(sync_conn):
+            insp = inspect(sync_conn)
+            cols = [c["name"] for c in insp.get_columns("tournaments")]
+            if "tournament_type" not in cols:
+                sync_conn.execute(
+                    text("ALTER TABLE tournaments ADD COLUMN tournament_type VARCHAR(20) NOT NULL DEFAULT 'regular'")
+                )
+        await conn.run_sync(_check_and_add)
+        await conn.commit()
 
 
 async def _seed_players_if_empty() -> None:

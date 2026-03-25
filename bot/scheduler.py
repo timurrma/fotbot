@@ -57,21 +57,56 @@ def create_scheduler(bot) -> AsyncIOScheduler:
 
 async def _announce_tournament(bot) -> None:
     from bot.db.session import AsyncSessionLocal
-    from bot.db.models import Whitelist
+    from bot.db.models import Whitelist, Tournament
+    from bot.services.tournament import get_active_tournament, get_pending_mega_tournament
     from sqlalchemy import select
 
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(Whitelist))
         players = result.scalars().all()
 
-    names = ", ".join(f"ID{p.user_id}" for p in players)
-    await bot.send_message(
-        settings.group_id,
-        f"⚽ Сегодня турнир!\n\n"
-        f"Участники: {names}\n\n"
-        f"Настрой состав в личных сообщениях с ботом командой /squad\n"
-        f"Запускай матчи командой /nextmatch в чате!"
-    )
+        names = ", ".join(
+            f"@{p.username}" if p.username else f"ID{p.user_id}"
+            for p in players
+        )
+        await bot.send_message(
+            settings.group_id,
+            f"⚽ Сегодня турнир!\n\n"
+            f"Участники: {names}\n\n"
+            f"Настрой состав в личных сообщениях с ботом командой /squad\n"
+            f"Запускай матчи командой /nextmatch в чате!"
+        )
+
+        # Создаём мегатурнир: если нет активного — сразу running, иначе pending
+        existing_mega = await get_pending_mega_tournament(session)
+        if not existing_mega:
+            active = await get_active_tournament(session)
+            mega_status = "pending" if active else "running"
+            mega = Tournament(status=mega_status, tournament_type="mega")
+            session.add(mega)
+            await session.commit()
+            await session.refresh(mega)
+
+            if mega_status == "running":
+                from bot.services.tournament import ensure_matches_created
+                await ensure_matches_created(session, mega)
+                n = len(players)
+                match_count = n * (n - 1) if n > 1 else 0
+                await bot.send_message(
+                    settings.group_id,
+                    f"🔥 <b>МЕГАТУРНИР начался!</b>\n\n"
+                    f"Каждый играет дома и в гостях — {match_count} матчей!\n"
+                    f"Участники: {names}\n\n"
+                    f"Запускай матчи командой /nextmatch",
+                    parse_mode="HTML",
+                )
+            else:
+                await bot.send_message(
+                    settings.group_id,
+                    "🔥 <b>После обычного турнира стартует МЕГАТУРНИР!</b>\n"
+                    "Каждый сыграет дома и в гостях. Следите за анонсом!",
+                    parse_mode="HTML",
+                )
 
 
 async def _auto_results(bot) -> None:

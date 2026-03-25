@@ -115,6 +115,7 @@ class Tournament(Base):
     week_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending / running / finished
+    tournament_type: Mapped[str] = mapped_column(String(20), default="regular")  # regular / mega
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
 
     matches: Mapped[list["Match"]] = relationship("Match", back_populates="tournament")
