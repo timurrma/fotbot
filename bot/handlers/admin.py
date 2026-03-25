@@ -81,9 +81,27 @@ async def cmd_removeuser(message: Message) -> None:
     await message.reply(f"✅ ID {target_id} удалён из whitelist.")
 
 
+PACK_MENU = [
+    ("weekly",    "еженедельный",        "5 карточек (65-74: 55%, 75-84: 35%, 85+: 10%)"),
+    ("special",   "специальный",         "5 карточек (65-74: 30%, 75-84: 35%, 85+: 35%)"),
+    ("russia",    "🇷🇺 Россия",          "1 русский игрок (1% Аршавин)"),
+    ("brazil",    "🇧🇷 Бразилия",        "2 бразильца"),
+    ("turkey",    "🇹🇷 Турция",          "1 турок"),
+    ("saudi",     "🇸🇦 Саудовская лига", "1 игрок Saudi Pro League"),
+    ("minirandom","мини-рандом",          "рандомно: russia/brazil/turkey/saudi"),
+    ("morning",   "🌅 утренний",         "2 карточки (<70: 85%, 70-75: 10%, 76-80: 4.5%, 80+: 0.5%)"),
+    ("record",    "🏆 Рекорд",           "3 карточки (65-74: 20%, 75-84: 75%, 85+: 5%)"),
+]
+
+PACK_HELP_TEXT = "📦 <b>Типы паков:</b>\n\n" + "\n".join(
+    f"<b>{i+1}.</b> {name} — {desc}"
+    for i, (_, name, desc) in enumerate(PACK_MENU)
+) + "\n\n<i>Выдать пак: /givepak @username &lt;номер&gt;</i>"
+
+
 @router.message(Command("givepak"))
 async def cmd_givepak(message: Message) -> None:
-    """Выдать специальный пак игроку вручную. /givepak @username или /givepak user_id [special]"""
+    """Без аргументов — показывает список паков. С аргументами (@username номер) — выдаёт пак."""
     if not is_admin(message.from_user.id):
         return
     if message.message_id in _processed_updates:
@@ -93,30 +111,59 @@ async def cmd_givepak(message: Message) -> None:
         _processed_updates.clear()
 
     parts = message.text.split()
-    if len(parts) < 2:
-        await message.reply("Использование: /givepak <user_id> [special]")
+
+    # Без аргументов — показать меню
+    if len(parts) == 1:
+        await message.reply(PACK_HELP_TEXT, parse_mode="HTML")
         return
 
+    # Нужно минимум: /givepak @username <номер>
+    if len(parts) < 3:
+        await message.reply(PACK_HELP_TEXT, parse_mode="HTML")
+        return
+
+    # Резолвим пользователя: @username или user_id
+    user_arg = parts[1]
+    target_id: int | None = None
+
+    if user_arg.startswith("@"):
+        username_clean = user_arg.lstrip("@")
+        async with AsyncSessionLocal() as session:
+            from sqlalchemy import select as _select
+            result = await session.execute(
+                _select(Whitelist).where(Whitelist.username == username_clean)
+            )
+            wl = result.scalar_one_or_none()
+            if not wl:
+                await message.reply(f"❌ Пользователь @{username_clean} не найден в whitelist.")
+                return
+            target_id = wl.user_id
+            display_name = f"@{username_clean}"
+    else:
+        try:
+            target_id = int(user_arg)
+            display_name = f"ID{target_id}"
+        except ValueError:
+            await message.reply("❌ Первый аргумент должен быть @username или user_id.")
+            return
+
+    # Резолвим номер пака
     try:
-        target_id = int(parts[1])
+        pack_num = int(parts[2])
     except ValueError:
-        await message.reply("user_id должен быть числом.")
+        await message.reply(PACK_HELP_TEXT, parse_mode="HTML")
         return
 
-    valid_types = {"weekly", "special", "russia", "brazil", "turkey", "minirandom", "morning", "saudi", "record"}
-    pack_type = parts[2] if len(parts) > 2 and parts[2] in valid_types else "weekly"
+    if not (1 <= pack_num <= len(PACK_MENU)):
+        await message.reply(f"❌ Номер пака должен быть от 1 до {len(PACK_MENU)}.\n\n" + PACK_HELP_TEXT, parse_mode="HTML")
+        return
+
+    pack_type, pack_name, _ = PACK_MENU[pack_num - 1]
 
     if pack_type == "minirandom":
         import random as _random
         pack_type = _random.choice(["russia", "brazil", "turkey", "saudi"])
-
-    pack_names = {
-        "weekly": "еженедельный", "special": "специальный",
-        "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция",
-        "morning": "🌅 утренний",
-        "saudi": "🇸🇦 Саудовская лига",
-        "record": "🏆 Рекорд",
-    }
+        pack_name = f"мини-рандом → {pack_type}"
 
     async with AsyncSessionLocal() as session:
         await give_pending_pack(session, target_id, pack_type)
@@ -124,12 +171,12 @@ async def cmd_givepak(message: Message) -> None:
     try:
         await message.bot.send_message(
             target_id,
-            f"🎴 Тебе выдан {pack_names[pack_type]} пак!\n\nОткрой его командой /openpack",
+            f"🎴 Тебе выдан пак «{pack_name}»!\n\nОткрой его командой /openpack",
         )
     except Exception:
         pass
 
-    await message.reply(f"✅ Пак «{pack_names[pack_type]}» добавлен в очередь игрока ID{target_id}.\n\nДоступные типы: weekly, special, russia, brazil, turkey, minirandom, morning")
+    await message.reply(f"✅ Пак «{pack_name}» добавлен в очередь {display_name}.")
 
 
 @router.message(Command("starttournament"))
