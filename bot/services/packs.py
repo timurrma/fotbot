@@ -455,7 +455,8 @@ def format_pack_announcement(username: str, players: list[Player], pack_type: st
         prefix = "└" if i == len(players) - 1 else "├"
         rating_star = "⭐" if player.overall_rating < 85 else "🌟" if player.overall_rating < 90 else "👑"
         club = f" ({player.club})" if player.club else ""
-        pos = f" [{player.position}]" if player.position else ""
+        positions = player.positions if player.positions else ([player.position] if player.position else [])
+        pos = f" [{'/'.join(positions)}]" if positions else ""
         lines.append(f"{prefix} {player.name}{club}{pos} — {player.overall_rating} {rating_star}")
 
     return "\n".join(lines)
