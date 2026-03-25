@@ -1321,6 +1321,11 @@ function renderMarket(incomingOffers) {
 }
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
+function cardDisplayName(c) {
+  const dupNum = getDupNumber(c.id);
+  return c.name + (dupNum > 1 ? ` <span style="font-size:10px;color:#94a3b8;font-weight:500;">#${dupNum}</span>` : '');
+}
+
 function openListModal() {
   // Показываем коллекцию текущего пользователя для выбора
   const modal = createModal('Выбери карточку для выставления');
@@ -1331,7 +1336,7 @@ function openListModal() {
     row.className = 'player-card';
     row.style.margin = '0 0 6px';
     const cf = nationalityFlag(c.nationality);
-    row.innerHTML = `<div class="player-info"><div class="player-name">${cf ? cf + ' ' : ''}${c.name}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
+    row.innerHTML = `<div class="player-info"><div class="player-name">${cf ? cf + ' ' : ''}${cardDisplayName(c)}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
     row.onclick = async () => {
       closeModal();
       await listCard(c.id);
@@ -1349,7 +1354,7 @@ function openOfferModal(listingId, wantCardId, wantCardName) {
     row.className = 'player-card';
     row.style.margin = '0 0 6px';
     const cf = nationalityFlag(c.nationality);
-    row.innerHTML = `<div class="player-info"><div class="player-name">${cf ? cf + ' ' : ''}${c.name}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
+    row.innerHTML = `<div class="player-info"><div class="player-name">${cf ? cf + ' ' : ''}${cardDisplayName(c)}</div><div class="player-meta">${c.position} · ${c.club || '—'}</div></div><div class="player-rating">${c.rating} ${star}</div>`;
     row.onclick = async () => {
       closeModal();
       await makeOffer(listingId, c.id);
