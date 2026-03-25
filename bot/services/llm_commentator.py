@@ -109,7 +109,7 @@ async def commentate_half(
                             parsed = inner
                     except (json.JSONDecodeError, ValueError):
                         pass
-                result_msgs = [item.strip() for item in parsed if isinstance(item, str) and item.strip()]
+                result_msgs = [item.replace("\\n", "\n").strip() for item in parsed if isinstance(item, str) and item.strip()]
                 if result_msgs:
                     return result_msgs
     except (json.JSONDecodeError, ValueError):
