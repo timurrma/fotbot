@@ -228,42 +228,46 @@ async def _open_russia_pack(
     session: AsyncSession,
     used_ids: set[int],
 ) -> list[Player]:
-    """Россия-пак: 1 игрок сборной России с взвешенной вероятностью по диапазонам.
-    1% шанс выбить А. Аршавина (id=2000032, 90 рейтинг).
+    """Россия-пак: 2 игрока сборной России с взвешенной вероятностью по диапазонам.
+    1% шанс выбить А. Аршавина (id=2000032, 90 рейтинг) первым игроком.
     """
-    # 1% шанс на Аршавина
+    players_out: list[Player] = []
+
+    # 1% шанс на Аршавина первым игроком
     if ARSHAVIN_ID not in used_ids and random.random() < 0.01:
         arshavin = await session.get(Player, ARSHAVIN_ID)
         if arshavin:
-            return [arshavin]
+            players_out.append(arshavin)
+            used_ids.add(arshavin.id)
 
-    # Диапазоны: 65-74 (68%), 75-78 (25%), 79+ (7%), исключая Аршавина
     ranges = [(65, 74), (75, 78), (79, 99)]
     weights = [68, 25, 7]
-    r_min, r_max = random.choices(ranges, weights=weights, k=1)[0]
 
-    exclude = used_ids | {ARSHAVIN_ID}
-    query = select(Player).where(
-        Player.nationality == "Russia",
-        Player.overall_rating >= r_min,
-        Player.overall_rating <= r_max,
-        Player.id.notin_(exclude),
-    )
-    result = await session.execute(query)
-    players = result.scalars().all()
-
-    if not players:
-        # Фоллбэк — любой русский кроме Аршавина
-        query2 = select(Player).where(
+    while len(players_out) < 2:
+        r_min, r_max = random.choices(ranges, weights=weights, k=1)[0]
+        exclude = used_ids | {ARSHAVIN_ID}
+        query = select(Player).where(
             Player.nationality == "Russia",
+            Player.overall_rating >= r_min,
+            Player.overall_rating <= r_max,
             Player.id.notin_(exclude),
         )
-        result2 = await session.execute(query2)
-        players = result2.scalars().all()
+        result = await session.execute(query)
+        players = result.scalars().all()
+        if not players:
+            query2 = select(Player).where(
+                Player.nationality == "Russia",
+                Player.id.notin_(exclude),
+            )
+            result2 = await session.execute(query2)
+            players = result2.scalars().all()
+        if not players:
+            break
+        p = random.choice(players)
+        players_out.append(p)
+        used_ids.add(p.id)
 
-    if not players:
-        return []
-    return [random.choice(players)]
+    return players_out
 
 
 async def _open_brazil_pack(
@@ -301,27 +305,32 @@ async def _open_turkey_pack(
     session: AsyncSession,
     used_ids: set[int],
 ) -> list[Player]:
-    """Турция-пак: 1 игрок сборной Турции."""
+    """Турция-пак: 2 игрока сборной Турции."""
+    players_out: list[Player] = []
     cfg = PACK_WEIGHTS["turkey"]
-    r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
-    query = select(Player).where(
-        Player.nationality == "Türkiye",
-        Player.overall_rating >= r_min,
-        Player.overall_rating <= r_max,
-        Player.id.notin_(used_ids) if used_ids else True,
-    )
-    result = await session.execute(query)
-    players = result.scalars().all()
-    if not players:
-        query2 = select(Player).where(
+    for _ in range(2):
+        r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
+        query = select(Player).where(
             Player.nationality == "Türkiye",
+            Player.overall_rating >= r_min,
+            Player.overall_rating <= r_max,
             Player.id.notin_(used_ids) if used_ids else True,
         )
-        result2 = await session.execute(query2)
-        players = result2.scalars().all()
-    if not players:
-        return []
-    return [random.choice(players)]
+        result = await session.execute(query)
+        players = result.scalars().all()
+        if not players:
+            query2 = select(Player).where(
+                Player.nationality == "Türkiye",
+                Player.id.notin_(used_ids) if used_ids else True,
+            )
+            result2 = await session.execute(query2)
+            players = result2.scalars().all()
+        if not players:
+            break
+        p = random.choice(players)
+        players_out.append(p)
+        used_ids.add(p.id)
+    return players_out
 
 
 async def _open_morning_pack(
@@ -379,27 +388,32 @@ async def _open_saudi_pack(
     session: AsyncSession,
     used_ids: set[int],
 ) -> list[Player]:
-    """Саудовская лига: 1 игрок из клубов Saudi Pro League."""
+    """Саудовская лига: 2 игрока из клубов Saudi Pro League."""
+    players_out: list[Player] = []
     cfg = PACK_WEIGHTS["saudi"]
-    r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
-    query = select(Player).where(
-        Player.club.in_(SAUDI_CLUBS),
-        Player.overall_rating >= r_min,
-        Player.overall_rating <= r_max,
-        Player.id.notin_(used_ids) if used_ids else True,
-    )
-    result = await session.execute(query)
-    players = result.scalars().all()
-    if not players:
-        query2 = select(Player).where(
+    for _ in range(2):
+        r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
+        query = select(Player).where(
             Player.club.in_(SAUDI_CLUBS),
+            Player.overall_rating >= r_min,
+            Player.overall_rating <= r_max,
             Player.id.notin_(used_ids) if used_ids else True,
         )
-        result2 = await session.execute(query2)
-        players = result2.scalars().all()
-    if not players:
-        return []
-    return [random.choice(players)]
+        result = await session.execute(query)
+        players = result.scalars().all()
+        if not players:
+            query2 = select(Player).where(
+                Player.club.in_(SAUDI_CLUBS),
+                Player.id.notin_(used_ids) if used_ids else True,
+            )
+            result2 = await session.execute(query2)
+            players = result2.scalars().all()
+        if not players:
+            break
+        p = random.choice(players)
+        players_out.append(p)
+        used_ids.add(p.id)
+    return players_out
 
 
 async def give_pending_pack(session: AsyncSession, user_id: int, pack_type: str = "weekly") -> None:
