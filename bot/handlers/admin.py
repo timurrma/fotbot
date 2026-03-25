@@ -130,8 +130,9 @@ async def cmd_givepack(message: Message) -> None:
         username_clean = user_arg.lstrip("@")
         async with AsyncSessionLocal() as session:
             from sqlalchemy import select as _select
+            from sqlalchemy import func as _func
             result = await session.execute(
-                _select(Whitelist).where(Whitelist.username == username_clean)
+                _select(Whitelist).where(_func.lower(Whitelist.username) == username_clean.lower())
             )
             wl = result.scalar_one_or_none()
             if not wl:
