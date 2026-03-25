@@ -8,6 +8,7 @@ from __future__ import annotations
 - Авто: если за день никто не вызвал матч — публикует только результат (без симуляции текста)
 """
 import asyncio
+import random
 from datetime import datetime, timezone
 from itertools import combinations
 
@@ -149,7 +150,9 @@ async def ensure_matches_created(
     players = wl_result.scalars().all()
     user_ids = [p.user_id for p in players]
 
-    for home_id, away_id in combinations(user_ids, 2):
+    pairs = list(combinations(user_ids, 2))
+    random.shuffle(pairs)
+    for home_id, away_id in pairs:
         match = Match(
             tournament_id=tournament.id,
             home_user_id=home_id,
