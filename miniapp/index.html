@@ -1328,6 +1328,7 @@ function cardDisplayName(c) {
 
 function openListModal() {
   // Показываем коллекцию текущего пользователя для выбора
+  _dupNumbers = null; // пересчитать на актуальных cards
   const modal = createModal('Выбери карточку для выставления');
   const sortedCards = [...cards].sort((a,b) => b.rating - a.rating);
   for (const c of sortedCards) {
@@ -1346,6 +1347,7 @@ function openListModal() {
 }
 
 function openOfferModal(listingId, wantCardId, wantCardName) {
+  _dupNumbers = null; // пересчитать на актуальных cards
   const modal = createModal(`Предложить в обмен за ${wantCardName}`);
   const sortedCards = [...cards].sort((a,b) => b.rating - a.rating);
   for (const c of sortedCards) {
