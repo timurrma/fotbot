@@ -91,11 +91,13 @@ async def proxy_photo(request: web.Request) -> web.Response:
     """GET /api/photo?url=... — проксирует фото с sofifa CDN."""
     import aiohttp as aio
     url = request.rel_url.query.get("url", "")
-    if not url.startswith("https://cdn.sofifa.net/"):
+    allowed = ("https://cdn.sofifa.net/", "https://img.a.transfermarkt.technology/")
+    if not any(url.startswith(p) for p in allowed):
         return web.Response(status=400)
+    referer = "https://www.transfermarkt.com/" if "transfermarkt" in url else "https://sofifa.com/"
     try:
         async with aio.ClientSession() as session:
-            async with session.get(url, headers={"Referer": "https://sofifa.com/"}, timeout=aio.ClientTimeout(total=5)) as resp:
+            async with session.get(url, headers={"Referer": referer}, timeout=aio.ClientTimeout(total=5)) as resp:
                 if resp.status != 200:
                     return web.Response(status=404)
                 data = await resp.read()
