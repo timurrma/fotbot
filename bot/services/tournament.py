@@ -697,7 +697,7 @@ async def build_standings_text(session: AsyncSession, tournament_id: int | None 
 
     rows = sorted(
         stats.items(),
-        key=lambda x: (x[1]["w"] * 3 + x[1]["d"], x[1]["gf"] - x[1]["ga"]),
+        key=lambda x: (x[1]["w"] * 3 + x[1]["d"], x[1]["gf"] - x[1]["ga"], x[1]["gf"]),
         reverse=True,
     )
 
