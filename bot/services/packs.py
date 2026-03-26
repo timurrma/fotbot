@@ -228,6 +228,7 @@ async def _open_starter_pack(
 
 
 ARSHAVIN_ID = 2000032
+TURAN_ID = 2000033
 
 
 async def _open_russia_pack(
@@ -311,23 +312,33 @@ async def _open_turkey_pack(
     session: AsyncSession,
     used_ids: set[int],
 ) -> list[Player]:
-    """Турция-пак: 2 игрока сборной Турции."""
+    """Турция-пак: 2 игрока сборной Турции.
+    1% шанс выбить A. Turan (id=2000033, 88 рейтинг) первым игроком.
+    """
     players_out: list[Player] = []
+
+    # 1% шанс на Арда Турана первым игроком
+    if TURAN_ID not in used_ids and random.random() < 0.01:
+        turan = await session.get(Player, TURAN_ID)
+        if turan:
+            players_out.append(turan)
+            used_ids.add(turan.id)
+
     cfg = PACK_WEIGHTS["turkey"]
-    for _ in range(2):
+    while len(players_out) < 2:
         r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
         query = select(Player).where(
             Player.nationality == "Türkiye",
             Player.overall_rating >= r_min,
             Player.overall_rating <= r_max,
-            Player.id.notin_(used_ids) if used_ids else True,
+            Player.id.notin_(used_ids | {TURAN_ID}),
         )
         result = await session.execute(query)
         players = result.scalars().all()
         if not players:
             query2 = select(Player).where(
                 Player.nationality == "Türkiye",
-                Player.id.notin_(used_ids) if used_ids else True,
+                Player.id.notin_(used_ids | {TURAN_ID}),
             )
             result2 = await session.execute(query2)
             players = result2.scalars().all()
