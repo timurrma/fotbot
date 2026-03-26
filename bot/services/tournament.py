@@ -469,7 +469,7 @@ async def _get_tournament_winner_ids(session: AsyncSession, tournament_id: int) 
     if not stats:
         return []
 
-    best_key = max((x[1]["pts"], x[1]["gd"], x[1]["gf"]) for x in stats.values())
+    best_key = max((s["pts"], s["gd"], s["gf"]) for s in stats.values())
     winners = [uid for uid, s in stats.items() if (s["pts"], s["gd"], s["gf"]) == best_key]
     return winners
 
