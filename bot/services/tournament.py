@@ -424,12 +424,73 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
                 standings_msg += f"\n\n{tournament_mvp_text}"
             await bot.send_message(settings.group_id, standings_msg, parse_mode="HTML")
 
-            # Если завершился обычный турнир — проверяем есть ли ожидающий мегатурнир
+            # Победителю обычного турнира — мини-рандом пак
             if tournament.tournament_type == "regular":
+                winner_ids = await _get_tournament_winner_ids(session, tournament.id)
+                if winner_ids:
+                    await asyncio.sleep(2)
+                    await _give_winner_pack(bot, session, winner_ids, wl_map)
+
                 await asyncio.sleep(2)
                 await maybe_start_pending_mega(bot, session)
 
         return True
+
+
+async def _get_tournament_winner_ids(session: AsyncSession, tournament_id: int) -> list[int]:
+    """Возвращает список победителей турнира.
+    1) Больше очков
+    2) Лучше разница голов
+    3) Больше забито
+    4) Если всё равно — оба победители
+    """
+    result = await session.execute(
+        select(Match).where(
+            Match.tournament_id == tournament_id,
+            Match.home_goals.isnot(None),
+        )
+    )
+    matches = result.scalars().all()
+    if not matches:
+        return []
+
+    stats: dict[int, dict] = {}
+    for m in matches:
+        for uid, gf, ga in [(m.home_user_id, m.home_goals, m.away_goals), (m.away_user_id, m.away_goals, m.home_goals)]:
+            if uid not in stats:
+                stats[uid] = {"pts": 0, "gd": 0, "gf": 0}
+            if gf > ga:
+                stats[uid]["pts"] += 3
+            elif gf == ga:
+                stats[uid]["pts"] += 1
+            stats[uid]["gd"] += gf - ga
+            stats[uid]["gf"] += gf
+
+    if not stats:
+        return []
+
+    best_key = max((x[1]["pts"], x[1]["gd"], x[1]["gf"]) for x in stats.values())
+    winners = [uid for uid, s in stats.items() if (s["pts"], s["gd"], s["gf"]) == best_key]
+    return winners
+
+
+async def _give_winner_pack(bot: Bot, session: AsyncSession, winner_ids: list[int], wl_map: dict) -> None:
+    """Выдаёт победителям обычного турнира мини-рандом пак и анонсирует в чат."""
+    from bot.services.packs import format_pack_announcement, open_pack, send_pack_with_photos
+
+    for winner_id in winner_ids:
+        winner_name = wl_map.get(winner_id, f"ID{winner_id}")
+        players = await open_pack(session, winner_id, "minirandom")
+        await session.commit()
+
+        await bot.send_message(
+            settings.group_id,
+            f"🎁 <b>Победитель турнира @{winner_name} получает мини-рандом пак!</b>",
+            parse_mode="HTML",
+        )
+        await asyncio.sleep(1)
+        await send_pack_with_photos(bot, settings.group_id, winner_name, players, "minirandom")
+        await asyncio.sleep(2)
 
 
 async def _get_tournament_mvp_text(session: AsyncSession, tournament_id: int, wl_map: dict) -> str | None:
@@ -566,8 +627,23 @@ async def auto_announce_results(bot: Bot) -> None:
         tournament.status = "finished"
         await session.commit()
 
-        # Если это был обычный турнир — запускаем pending мегатурнир и сразу играем его матчи
+        final_standings = await build_standings_text(session, tournament.id)
+        t_label = "🔥 МЕГАТУРНИР завершён!" if tournament.tournament_type == "mega" else "🏁 Турнир недели завершён!"
+        wl_result2 = await session.execute(select(Whitelist))
+        wl_map2 = {w.user_id: (w.username or f"ID{w.user_id}") for w in wl_result2.scalars().all()}
+        tournament_mvp_text = await _get_tournament_mvp_text(session, tournament.id, wl_map2)
+        standings_msg = f"<b>{t_label}</b>\n\n{final_standings}"
+        if tournament_mvp_text:
+            standings_msg += f"\n\n{tournament_mvp_text}"
+        await bot.send_message(settings.group_id, standings_msg, parse_mode="HTML")
+
+        # Если это был обычный турнир — выдаём пак победителю и запускаем мегатурнир
         if tournament.tournament_type == "regular":
+            winner_ids = await _get_tournament_winner_ids(session, tournament.id)
+            if winner_ids:
+                await asyncio.sleep(2)
+                await _give_winner_pack(bot, session, winner_ids, wl_map2)
+
             await asyncio.sleep(2)
             started = await maybe_start_pending_mega(bot, session)
             if started:
