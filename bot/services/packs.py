@@ -38,6 +38,14 @@ PACK_WEIGHTS = {
         "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
         "weights": [68, 23, 7, 2],
     },
+    "france": {
+        "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
+        "weights": [68, 23, 7, 2],
+    },
+    "england": {
+        "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
+        "weights": [68, 23, 7, 2],
+    },
     "turkey": {
         "ranges": [(65, 74), (75, 78), (79, 99)],
         "weights": [68, 25, 7],
@@ -157,6 +165,10 @@ async def open_pack(
         players_out = await _open_russia_pack(session, used_player_ids)
     elif pack_type == "brazil":
         players_out = await _open_brazil_pack(session, used_player_ids)
+    elif pack_type == "france":
+        players_out = await _open_nation_pack(session, used_player_ids, "France", "france")
+    elif pack_type == "england":
+        players_out = await _open_nation_pack(session, used_player_ids, "England", "england")
     elif pack_type == "turkey":
         players_out = await _open_turkey_pack(session, used_player_ids)
     elif pack_type == "morning":
@@ -297,6 +309,39 @@ async def _open_brazil_pack(
         if not players:
             query2 = select(Player).where(
                 Player.nationality == "Brazil",
+                Player.id.notin_(used_ids) if used_ids else True,
+            )
+            result2 = await session.execute(query2)
+            players = result2.scalars().all()
+        if players:
+            p = random.choice(players)
+            players_out.append(p)
+            used_ids.add(p.id)
+    return players_out
+
+
+async def _open_nation_pack(
+    session: AsyncSession,
+    used_ids: set[int],
+    nationality: str,
+    pack_key: str,
+) -> list[Player]:
+    """Национальный пак: 2 игрока указанной национальности."""
+    players_out: list[Player] = []
+    cfg = PACK_WEIGHTS[pack_key]
+    for _ in range(2):
+        r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
+        query = select(Player).where(
+            Player.nationality == nationality,
+            Player.overall_rating >= r_min,
+            Player.overall_rating <= r_max,
+            Player.id.notin_(used_ids) if used_ids else True,
+        )
+        result = await session.execute(query)
+        players = result.scalars().all()
+        if not players:
+            query2 = select(Player).where(
+                Player.nationality == nationality,
                 Player.id.notin_(used_ids) if used_ids else True,
             )
             result2 = await session.execute(query2)
@@ -494,7 +539,7 @@ async def has_starter_pack(session: AsyncSession, user_id: int) -> bool:
 
 def format_pack_announcement(username: str, players: list[Player], pack_type: str = "weekly") -> str:
     """Формирует текстовый анонс открытия пака (без фото)."""
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний", "saudi": "🇸🇦 Саудовская лига", "record": "🏆 Рекорд", "consolation": "🤝 Утешающий", "weekly_tournament": "🏅 Еженедельный турнир"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "france": "🇫🇷 Франция", "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Англия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний", "saudi": "🇸🇦 Саудовская лига", "record": "🏆 Рекорд", "consolation": "🤝 Утешающий", "weekly_tournament": "🏅 Еженедельный турнир"}
     header = stars.get(pack_type, "🎴")
 
     lines = [f"{header} @{username} открыл пак!\n"]
@@ -522,7 +567,7 @@ async def send_pack_with_photos(
     """
     from aiogram.types import InputMediaPhoto
 
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний", "saudi": "🇸🇦 Саудовская лига", "record": "🏆 Рекорд", "consolation": "🤝 Утешающий", "weekly_tournament": "🏅 Еженедельный турнир"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "france": "🇫🇷 Франция", "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Англия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний", "saudi": "🇸🇦 Саудовская лига", "record": "🏆 Рекорд", "consolation": "🤝 Утешающий", "weekly_tournament": "🏅 Еженедельный турнир"}
     header = stars.get(pack_type, "🎴")
 
     # Берём только игроков с фото (макс 10 для медиагруппы)

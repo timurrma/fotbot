@@ -480,7 +480,7 @@ async def _give_winner_pack(bot: Bot, session: AsyncSession, winner_ids: list[in
 
     for winner_id in winner_ids:
         winner_name = wl_map.get(winner_id, f"ID{winner_id}")
-        actual_pack = random.choice(["russia", "brazil", "turkey", "saudi"])
+        actual_pack = random.choice(["russia", "brazil", "france", "england", "turkey", "saudi"])
         await give_pending_pack(session, winner_id, actual_pack)
         await session.commit()
 
