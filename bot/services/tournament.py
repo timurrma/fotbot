@@ -475,23 +475,29 @@ async def _get_tournament_winner_ids(session: AsyncSession, tournament_id: int) 
 
 
 async def _give_winner_pack(bot: Bot, session: AsyncSession, winner_ids: list[int], wl_map: dict) -> None:
-    """Выдаёт победителям обычного турнира мини-рандом пак и анонсирует в чат."""
-    from bot.services.packs import format_pack_announcement, open_pack, send_pack_with_photos
+    """Выдаёт победителям обычного турнира мини-рандом пак (pending — открывается через /openpack)."""
+    from bot.services.packs import give_pending_pack
 
     for winner_id in winner_ids:
         winner_name = wl_map.get(winner_id, f"ID{winner_id}")
         actual_pack = random.choice(["russia", "brazil", "turkey", "saudi"])
-        players = await open_pack(session, winner_id, actual_pack)
+        await give_pending_pack(session, winner_id, actual_pack)
         await session.commit()
 
         await bot.send_message(
             settings.group_id,
-            f"🎁 <b>Победитель турнира @{winner_name} получает мини-рандом пак!</b>",
+            f"🎁 <b>Победитель турнира @{winner_name} получает мини-рандом пак!</b>\n"
+            f"Открой его командой /openpack в личных сообщениях.",
             parse_mode="HTML",
         )
+        try:
+            await bot.send_message(
+                winner_id,
+                f"🎁 Ты победил в турнире! Тебе выдан мини-рандом пак.\nОткрой его командой /openpack",
+            )
+        except Exception:
+            pass
         await asyncio.sleep(1)
-        await send_pack_with_photos(bot, settings.group_id, winner_name, players, actual_pack)
-        await asyncio.sleep(2)
 
 
 async def _get_tournament_mvp_text(session: AsyncSession, tournament_id: int, wl_map: dict) -> str | None:
