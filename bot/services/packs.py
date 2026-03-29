@@ -51,8 +51,8 @@ PACK_WEIGHTS = {
         "weights": [68, 25, 7],
     },
     "morning": {
-        "ranges": [(50, 69), (70, 75), (76, 80), (81, 99)],
-        "weights": [85, 10, 4.5, 0.5],
+        "ranges": [(50, 69), (70, 75), (76, 80), (81, 85), (86, 99)],
+        "weights": [20, 20, 50, 8, 2],
     },
     "saudi": {
         "ranges": [(65, 74), (75, 78), (79, 99)],
@@ -399,10 +399,10 @@ async def _open_morning_pack(
     session: AsyncSession,
     used_ids: set[int],
 ) -> list[Player]:
-    """Утренний пак: 2 любых игрока. Вероятности: <70 (85%), 70-75 (10%), 76-80 (4.5%), 80+ (0.5%)."""
+    """Утренний пак: 4 игрока. <70 (20%), 70-75 (20%), 76-80 (50%), 81-85 (8%), 86+ (2%)."""
     players_out: list[Player] = []
     cfg = PACK_WEIGHTS["morning"]
-    for _ in range(2):
+    for _ in range(4):
         r_min, r_max = random.choices(cfg["ranges"], weights=cfg["weights"], k=1)[0]
         player = await _pick_player(session, r_min, r_max, exclude_ids=used_ids)
         if player:
