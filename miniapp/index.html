@@ -170,6 +170,11 @@
     height: clamp(360px, 52vh, 520px);
     overflow: hidden;
   }
+  .pitch.compact {
+    padding: 12px 8px;
+    gap: 4px;
+    height: clamp(420px, 62vh, 620px);
+  }
   .pitch::before {
     content: '';
     position: absolute;
@@ -224,6 +229,12 @@
     width: 68px;
     position: relative;
     z-index: 5;
+  }
+  .pitch.compact .slot {
+    width: 60px;
+  }
+  .pitch.compact .slot-name {
+    max-width: 58px;
   }
   .slot-avatar {
     width: 52px;
@@ -637,13 +648,13 @@ const FORMATIONS = {
   '3-5-2': [
     ['GK'],
     ['CB1', 'CB2', 'CB3'],
-    ['LM', 'CDM1', 'CM', 'CDM2', 'RM'],
+    ['LM', 'CDM1', 'CAM', 'CDM2', 'RM'],
     ['ST1', 'ST2'],
   ],
   '5-3-2': [
     ['GK'],
     ['LB', 'CB1', 'CB2', 'CB3', 'RB'],
-    ['CM1', 'CM2', 'CDM'],
+    ['CM1', 'CM2', 'CM3'],
     ['ST1', 'ST2'],
   ],
   '4-2-3-1': [
@@ -710,7 +721,8 @@ const FORMATIONS = {
     ['GK'],
     ['LB', 'CB1', 'CB2', 'RB'],
     ['CM1', 'CM2', 'CM3'],
-    ['ST1', 'ST2', 'ST3'],
+    ['CAM1', 'CAM2'],
+    ['ST'],
   ],
 };
 
@@ -938,18 +950,18 @@ function selectFormation(f) {
 const FORMATION_EDGES = {
   '4-4-2': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','LM'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM2'],['RB','RM'],['LM','CM1'],['LM','ST1'],['CM1','CM2'],['CM1','ST1'],['CM2','RM'],['CM2','ST2'],['RM','ST2'],['ST1','ST2']],
   '4-3-3': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['LB','LW'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM3'],['RB','CM3'],['RB','RW'],['CM1','CM2'],['CM1','LW'],['CM2','CM3'],['CM2','ST'],['CM3','RW'],['LW','ST'],['ST','RW']],
-  '3-5-2': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['CB1','CB2'],['CB1','LM'],['CB1','CDM1'],['CB2','CB3'],['CB2','CDM1'],['CB2','CM'],['CB2','CDM2'],['CB3','CDM2'],['CB3','RM'],['LM','CDM1'],['LM','ST1'],['CDM1','CM'],['CM','CDM2'],['CM','ST1'],['CM','ST2'],['CDM2','RM'],['RM','ST2'],['ST1','ST2']],
-  '5-3-2': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CM1'],['CB2','CB3'],['CB2','CDM'],['CB3','RB'],['CB3','CM2'],['RB','CM2'],['CM1','CM2'],['CM1','CDM'],['CM1','ST1'],['CM2','CDM'],['CM2','ST2'],['CDM','ST1'],['CDM','ST2'],['ST1','ST2']],
+  '3-5-2': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['CB1','CB2'],['CB1','LM'],['CB1','CDM1'],['CB2','CB3'],['CB2','CDM1'],['CB2','CDM2'],['CB3','CDM2'],['CB3','RM'],['LM','CDM1'],['LM','ST1'],['CDM1','CAM'],['CAM','CDM2'],['CAM','ST1'],['CAM','ST2'],['CDM2','RM'],['RM','ST2'],['ST1','ST2']],
+  '5-3-2': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CM1'],['CB2','CB3'],['CB2','CM2'],['CB3','RB'],['CB3','CM3'],['RB','CM3'],['CM1','CM2'],['CM1','ST1'],['CM2','CM3'],['CM2','ST1'],['CM2','ST2'],['CM3','ST2'],['ST1','ST2']],
   '4-2-3-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CDM1'],['LB','LM'],['CB1','CB2'],['CB1','CDM1'],['CB2','RB'],['CB2','CDM2'],['RB','CDM2'],['RB','RM'],['CDM1','CDM2'],['CDM1','LM'],['CDM1','CAM'],['CDM2','RM'],['CDM2','CAM'],['LM','CAM'],['LM','ST'],['CAM','RM'],['CAM','ST'],['RM','ST']],
   '4-1-4-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','LM'],['CB1','CB2'],['CB1','CDM'],['CB1','CM1'],['CB2','RB'],['CB2','CDM'],['CB2','CM2'],['RB','RM'],['CDM','CM1'],['CDM','CM2'],['LM','CM1'],['LM','ST'],['CM1','CM2'],['CM1','ST'],['CM2','RM'],['CM2','ST'],['RM','ST']],
   '4-5-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','LM'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM3'],['RB','RM'],['LM','CM1'],['LM','ST'],['CM1','CM2'],['CM2','CM3'],['CM2','ST'],['CM3','RM'],['CM3','ST'],['RM','ST']],
   '3-4-3': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['CB1','CB2'],['CB1','LM'],['CB1','CM1'],['CB2','CB3'],['CB2','CM1'],['CB2','CM2'],['CB3','RM'],['CB3','CM2'],['LM','CM1'],['LM','LW'],['CM1','CM2'],['CM1','LW'],['CM1','ST'],['CM2','RM'],['CM2','RW'],['CM2','ST'],['RM','RW'],['LW','ST'],['ST','RW']],
-  '4-3-3 (4)': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['LB','LW'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM2'],['RB','CAM'],['RB','RW'],['CM1','CM2'],['CM1','LW'],['CM1','CAM'],['CM2','CAM'],['CM2','ST'],['CAM','LW'],['CAM','ST'],['CAM','RW'],['LW','ST'],['ST','RW']],
+  '4-3-3 (4)': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM2'],['RB','CM2'],['CM1','CM2'],['CM1','CAM'],['CM1','LW'],['CM2','CAM'],['CAM','LW'],['CAM','ST'],['CAM','RW'],['LW','ST'],['ST','RW']],
   '4-1-2-1-2': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CDM'],['CB1','CM1'],['CB2','RB'],['CB2','CDM'],['CB2','CM2'],['RB','CM2'],['CDM','CM1'],['CDM','CM2'],['CDM','CAM'],['CM1','CAM'],['CM1','ST1'],['CM2','CAM'],['CM2','ST2'],['CAM','ST1'],['CAM','ST2'],['ST1','ST2']],
   '4-2-2-2': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CDM1'],['LB','CAM1'],['CB1','CB2'],['CB1','CDM1'],['CB2','RB'],['CB2','CDM2'],['RB','CDM2'],['RB','CAM2'],['CDM1','CDM2'],['CDM1','CAM1'],['CDM2','CAM2'],['CAM1','CAM2'],['CAM1','ST1'],['CAM2','ST2'],['ST1','ST2']],
   '4-2-1-3': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CDM1'],['LB','LW'],['CB1','CB2'],['CB1','CDM1'],['CB2','RB'],['CB2','CDM2'],['RB','CDM2'],['RB','RW'],['CDM1','CDM2'],['CDM1','CAM'],['CDM1','LW'],['CDM2','CAM'],['CDM2','RW'],['CAM','LW'],['CAM','ST'],['CAM','RW'],['LW','ST'],['ST','RW']],
   '4-2-4': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['LB','LW'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM2'],['RB','CM2'],['RB','RW'],['CM1','CM2'],['CM1','LW'],['CM1','ST1'],['CM2','RW'],['CM2','ST2'],['LW','ST1'],['ST1','ST2'],['ST2','RW']],
-  '4-3-2-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM3'],['RB','CM3'],['CM1','CM2'],['CM1','ST1'],['CM2','CM3'],['CM2','ST1'],['CM2','ST2'],['CM2','ST3'],['CM3','ST3'],['ST1','ST2'],['ST2','ST3']],
+  '4-3-2-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM3'],['RB','CM3'],['CM1','CM2'],['CM2','CM3'],['CM1','CAM1'],['CM2','CAM1'],['CM2','CAM2'],['CM3','CAM2'],['CAM1','CAM2'],['CAM1','ST'],['CAM2','ST']],
 };
 
 function getSlotNeighbors(form) {
@@ -1087,6 +1099,7 @@ function renderPitch() {
   const pitch = document.getElementById('pitch');
   const rows = [...(FORMATIONS[formation] || [])].reverse(); // вратарь снизу
   pitch.innerHTML = '';
+  pitch.classList.toggle('compact', rows.length >= 5);
 
   const overlay = document.createElement('div');
   overlay.id = 'chemLinks';

@@ -55,8 +55,8 @@ ASSIST_PROBS = {
 FORMATIONS_SLOTS: dict[str, list[str]] = {
     "4-4-2": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "LM", "RM", "ST", "ST"],
     "4-3-3": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CDM", "LW", "RW", "ST"],
-    "3-5-2": ["GK", "CB", "CB", "CB", "CM", "CM", "CDM", "LM", "RM", "ST", "ST"],
-    "5-3-2": ["GK", "CB", "CB", "CB", "LB", "RB", "CM", "CM", "CDM", "ST", "ST"],
+    "3-5-2": ["GK", "CB", "CB", "CB", "CDM", "CDM", "CAM", "LM", "RM", "ST", "ST"],
+    "5-3-2": ["GK", "CB", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "ST", "ST"],
     "4-2-3-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "LM", "RM", "ST"],
     "4-1-4-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "LM", "RM", "ST"],
     "4-5-1": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "LM", "RM", "ST"],
@@ -66,7 +66,7 @@ FORMATIONS_SLOTS: dict[str, list[str]] = {
     "4-2-2-2": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "CAM", "ST", "ST"],
     "4-2-1-3": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "LW", "RW", "ST"],
     "4-2-4": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "LW", "RW", "ST", "ST"],
-    "4-3-2-1": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "ST", "ST", "ST"],
+    "4-3-2-1": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "CAM", "CAM", "ST"],
 }
 
 # Загружаем графы соседства из JSON (FUT-style)
