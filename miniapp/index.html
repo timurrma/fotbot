@@ -130,9 +130,12 @@
   /* Chemistry SVG overlay — под карточками */
   .pitch-svg-overlay {
     position: absolute;
-    inset: 0;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
     z-index: 0;
+    overflow: visible;
   }
 
   /* ─── Pitch ─── */
@@ -144,29 +147,8 @@
     background: linear-gradient(180deg, #1b4332 0%, #2d6a4f 50%, #1b4332 100%);
     border-radius: 12px;
     position: relative;
-    padding: 14px 4px;
+    padding: 10px 4px 10px;
     border: 1px solid rgba(255,255,255,0.05);
-  }
-  /* Field lines */
-  .pitch::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 10%;
-    right: 10%;
-    height: 1px;
-    background: rgba(255,255,255,0.15);
-  }
-  .pitch::after {
-    content: '';
-    position: absolute;
-    top: 30%;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.15);
   }
 
   .pitch-row {
@@ -967,23 +949,32 @@ function drawChemLinks() {
   if (!svg) return;
   svg.innerHTML = '';
 
-  const pitchRect = pitchEl.getBoundingClientRect();
-  svg.setAttribute('width', pitchRect.width);
-  svg.setAttribute('height', pitchRect.height);
+  const W = pitchEl.offsetWidth;
+  const H = pitchEl.offsetHeight;
+  svg.setAttribute('width', W);
+  svg.setAttribute('height', H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
   const neighbors = getSlotNeighbors(formation);
   const allSlots = FORMATIONS[formation].flat();
 
-  // Собираем центры аватарок слотов (относительно pitch)
+  // Центры аватарок относительно pitch через offsetLeft/offsetTop
   const slotCenters = {};
   for (const slot of allSlots) {
     const slotEl = pitchEl.querySelector(`[data-slot="${slot}"]`);
     if (!slotEl) continue;
     const avatarEl = slotEl.querySelector('.slot-avatar') || slotEl;
-    const r = avatarEl.getBoundingClientRect();
+    // offsetLeft/Top относительно pitchEl
+    let ox = 0, oy = 0;
+    let el = avatarEl;
+    while (el && el !== pitchEl) {
+      ox += el.offsetLeft;
+      oy += el.offsetTop;
+      el = el.offsetParent;
+    }
     slotCenters[slot] = {
-      x: r.left + r.width / 2 - pitchRect.left,
-      y: r.top + r.height / 2 - pitchRect.top,
+      x: ox + avatarEl.offsetWidth / 2,
+      y: oy + avatarEl.offsetHeight / 2,
     };
   }
 
@@ -1723,6 +1714,7 @@ async function declineOffer(offerId) {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 init();
+window.addEventListener('resize', () => { drawChemLinks(); });
 </script>
 </body>
 </html>
