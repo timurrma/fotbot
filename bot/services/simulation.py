@@ -7,7 +7,9 @@
 3. Для каждого гола — выбираем автора и ассистента по вероятностям позиции
 4. Собираем список событий для LLM-комментатора
 """
+import json
 import math
+import os
 import random
 from dataclasses import dataclass, field
 from typing import Optional
@@ -67,57 +69,25 @@ FORMATIONS_SLOTS: dict[str, list[str]] = {
     "4-3-2-1": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "ST", "ST", "ST"],
 }
 
-# Структура формаций для расчёта химии (ряды слотов, снизу вверх: GK → атака)
-# Используется для вычисления координат и соседей каждого слота
-FORMATIONS_LAYOUT: dict[str, list[list[str]]] = {
-    "4-4-2": [["GK"], ["LB", "CB1", "CB2", "RB"], ["LM", "CM1", "CM2", "RM"], ["ST1", "ST2"]],
-    "4-3-3": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM", "CM1", "CM2"], ["LW", "ST", "RW"]],
-    "3-5-2": [["GK"], ["CB1", "CB2", "CB3"], ["LM", "CDM", "CM1", "CM2", "RM"], ["ST1", "ST2"]],
-    "5-3-2": [["GK"], ["LB", "CB1", "CB2", "CB3", "RB"], ["CDM", "CM1", "CM2"], ["ST1", "ST2"]],
-    "4-2-3-1": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM1", "CDM2"], ["LM", "CAM", "RM"], ["ST"]],
-    "4-1-4-1": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM"], ["LM", "CM1", "CM2", "RM"], ["ST"]],
-    "4-5-1": [["GK"], ["LB", "CB1", "CB2", "RB"], ["LM", "CM1", "CM2", "CM3", "RM"], ["ST"]],
-    "3-4-3": [["GK"], ["CB1", "CB2", "CB3"], ["LM", "CM1", "CM2", "RM"], ["LW", "ST", "RW"]],
-    "4-3-3 (4)": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CM1", "CM2", "CAM"], ["LW", "ST", "RW"]],
-    "4-1-2-1-2": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM"], ["CM1", "CM2"], ["CAM"], ["ST1", "ST2"]],
-    "4-2-2-2": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM1", "CDM2"], ["CAM1", "CAM2"], ["ST1", "ST2"]],
-    "4-2-1-3": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM1", "CDM2"], ["CAM"], ["LW", "ST", "RW"]],
-    "4-2-4": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CM1", "CM2"], ["LW", "ST1", "ST2", "RW"]],
-    "4-3-2-1": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CM1", "CM2", "CM3"], ["ST1", "ST2", "ST3"]],
-}
+# Загружаем графы соседства из JSON (FUT-style)
+_GRAPH_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "fut_formation_graphs.json")
+with open(_GRAPH_PATH, encoding="utf-8") as _f:
+    _FORMATION_GRAPHS: dict = json.load(_f)["formations"]
 
 
 def get_slot_neighbors(formation: str) -> dict[str, set[str]]:
     """
     Возвращает словарь {slot_name: set of neighbor slot_names} для заданной формации.
-    Соседи — слоты с Евклидовым расстоянием ≤ 1.5 (row-нормализованное + col*3).
+    Соседи берутся из захардкоженных FUT-графов (data/fut_formation_graphs.json).
     """
-    layout = FORMATIONS_LAYOUT.get(formation)
-    if not layout:
+    graph = _FORMATION_GRAPHS.get(formation)
+    if not graph:
         return {}
 
-    # Вычисляем координаты каждого слота
-    # Шаг col = 1.0 между соседними в ряду (независимо от числа игроков).
-    # Порог 1.6: соседние в ряду (dist=1.0) ✓, через одного (dist=2.0) ✗,
-    # смежные ряды рядом (dist≈1.0-1.4) ✓, далёкие по диагонали (dist≈1.8+) ✗
-    coords: dict[str, tuple[float, float]] = {}
-    for row_idx, row in enumerate(layout):
-        n = len(row)
-        center = (n - 1) / 2.0
-        for col_idx, slot in enumerate(row):
-            coords[slot] = (float(row_idx), float(col_idx) - center)
-
-    # Определяем соседей
-    neighbors: dict[str, set[str]] = {slot: set() for slot in coords}
-    slots = list(coords.keys())
-    for i, s1 in enumerate(slots):
-        for s2 in slots[i + 1:]:
-            r1, c1 = coords[s1]
-            r2, c2 = coords[s2]
-            dist = math.sqrt((r1 - r2) ** 2 + (c1 - c2) ** 2)
-            if dist <= 1.6:
-                neighbors[s1].add(s2)
-                neighbors[s2].add(s1)
+    neighbors: dict[str, set[str]] = {}
+    for a, b in graph["edges"]:
+        neighbors.setdefault(a, set()).add(b)
+        neighbors.setdefault(b, set()).add(a)
     return neighbors
 
 
@@ -127,9 +97,15 @@ def compute_team_chemistry(
     players: list[Player],
 ) -> float:
     """
-    Вычисляет химию команды 0-100.
-    slot_names[i] и players[i] — слот и игрок в нём.
-    Возвращает team_chem: float 0-100.
+    Вычисляет химию команды 0-100 (FIFA-like).
+
+    Per-player chemistry = min(10, sum(link_strength для каждого соседа))
+    - link: клуб = 5, нация+лига = 5, нация ИЛИ лига = 2.5, ничего = 0
+
+    team_chem = sum(player_chems) / 110 * 100
+
+    При всех зелёных связях — всегда 100%.
+    При всех жёлтых — 77-89% в зависимости от формации.
     """
     if not players or not formation:
         return 0.0
@@ -137,36 +113,29 @@ def compute_team_chemistry(
     neighbors = get_slot_neighbors(formation)
     slot_to_player: dict[str, Player] = dict(zip(slot_names, players))
 
-    def link_strength(a: Player, b: Player) -> int:
+    def link_strength(a: Player, b: Player) -> float:
         if a.id < 0 or b.id < 0:
-            return 0
+            return 0.0
         same_club = bool(a.club and b.club and a.club == b.club)
         same_nation = bool(a.nationality and b.nationality and a.nationality == b.nationality)
         same_league = bool(a.league_name and b.league_name and a.league_name == b.league_name)
         if same_club:
-            return 3
+            return 5.0
         if same_nation and same_league:
-            return 3
+            return 5.0
         if same_nation or same_league:
-            return 2
-        return 0
+            return 2.5
+        return 0.0
 
-    total_chem = 0
-    max_possible = 0
+    total_chem = 0.0
     for slot, player in slot_to_player.items():
         if player.id < 0:
             continue
         nb_slots = [s for s in neighbors.get(slot, set()) if slot_to_player.get(s)]
-        if not nb_slots:
-            continue
-        player_chem = sum(link_strength(player, slot_to_player[nb]) for nb in nb_slots)
-        player_max = len(nb_slots) * 3
-        total_chem += player_chem
-        max_possible += player_max
+        raw = sum(link_strength(player, slot_to_player[nb]) for nb in nb_slots)
+        total_chem += min(10.0, raw)
 
-    if max_possible == 0:
-        return 0.0
-    return round(total_chem / max_possible * 100, 1)
+    return round(total_chem / 110 * 100, 1)
 
 
 @dataclass

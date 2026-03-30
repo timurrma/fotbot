@@ -26,9 +26,10 @@ from bot.services.simulation import events_to_dict, simulate_match, FORMATIONS_S
 async def _get_squad_cards(
     session: AsyncSession,
     user_id: int,
-) -> tuple[str, list[tuple[int, object]]]:
+) -> tuple[str, list[tuple[int, object]], list[str], list[str]]:
     """
-    Возвращает (formation, [(user_card_id, Player), ...]) для игрока.
+    Возвращает (formation, [(user_card_id, Player), ...], slot_pos_list, slot_names) для игрока.
+    slot_pos_list — позиции (CB, CM...), slot_names — имена слотов (CB1, CM2...).
     Если состав не настроен — берёт топ-11 по рейтингу, схема 4-4-2.
     """
     from sqlalchemy.orm import joinedload
@@ -43,7 +44,7 @@ async def _get_squad_cards(
             "GK": "GK",
             "CB1": "CB", "CB2": "CB", "CB3": "CB",
             "LB": "LB", "RB": "RB",
-            "CDM1": "CDM", "CDM2": "CDM",
+            "CDM": "CDM", "CDM1": "CDM", "CDM2": "CDM",
             "CM": "CM", "CM1": "CM", "CM2": "CM", "CM3": "CM",
             "LM": "LM", "RM": "RM",
             "CAM": "CAM", "CAM1": "CAM", "CAM2": "CAM",
@@ -51,18 +52,21 @@ async def _get_squad_cards(
             "ST": "ST", "ST1": "ST", "ST2": "ST", "ST3": "ST",
         }
         SLOT_ORDER = ["GK", "CB1", "CB2", "CB3", "LB", "RB",
-                      "CDM1", "CDM2", "CM", "CM1", "CM2", "CM3",
-                      "LM", "RM", "CAM", "LW", "RW", "ST", "ST1", "ST2"]
+                      "CDM", "CDM1", "CDM2", "CM", "CM1", "CM2", "CM3",
+                      "LM", "RM", "CAM", "CAM1", "CAM2", "LW", "RW",
+                      "ST", "ST1", "ST2", "ST3"]
         ordered_slots = sorted(assignments.keys(), key=lambda s: SLOT_ORDER.index(s) if s in SLOT_ORDER else 99)
         from sqlalchemy.orm import joinedload
         from bot.db.models import Player as PlayerModel
         cards = []
+        slot_name_list = []
         for slot_name in ordered_slots:
             card_id = assignments[slot_name]
             card = await session.get(UserCard, card_id, options=[joinedload(UserCard.player)])
             if card:
                 slot_pos = SLOT_TO_POS.get(slot_name, "CM")
                 cards.append((card_id, card.player, slot_pos))
+                slot_name_list.append(slot_name)
 
         # Если меньше 11 — добиваем пустые слоты фантомным игроком рейтинг 40
         if len(cards) < 11:
@@ -77,9 +81,10 @@ async def _get_squad_cards(
                     photo_url=None, league_id=None, is_national_team=False,
                 )
                 cards.append((-1, phantom, slot_pos))
+                slot_name_list.append(slot_pos)
 
         slot_pos_list = [sp for cid, p, sp in cards[:11]]
-        return formation, [(cid, p) for cid, p, sp in cards[:11]], slot_pos_list
+        return formation, [(cid, p) for cid, p, sp in cards[:11]], slot_pos_list, slot_name_list[:11]
 
     # Фоллбэк: топ-11 по рейтингу
     from sqlalchemy import desc
@@ -95,7 +100,10 @@ async def _get_squad_cards(
     cards_raw = result.scalars().all()
     fallback_slots = FORMATIONS_SLOTS.get("4-4-2")
     slot_pos_list = [fallback_slots[i] if i < len(fallback_slots) else "CM" for i in range(len(cards_raw))]
-    return "4-4-2", [(c.id, c.player) for c in cards_raw], slot_pos_list
+    # Для фоллбэка: имена слотов 4-4-2
+    fallback_slot_names = ["GK", "CB1", "CB2", "LB", "RB", "CM1", "CM2", "LM", "RM", "ST1", "ST2"]
+    slot_name_list = [fallback_slot_names[i] if i < len(fallback_slot_names) else "CM" for i in range(len(cards_raw))]
+    return "4-4-2", [(c.id, c.player) for c in cards_raw], slot_pos_list, slot_name_list
 
 
 async def get_or_create_tournament(session: AsyncSession) -> Tournament:
@@ -268,8 +276,8 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         if not match:
             return False
 
-        home_formation, home_cards, home_slot_pos = await _get_squad_cards(session, match.home_user_id)
-        away_formation, away_cards, away_slot_pos = await _get_squad_cards(session, match.away_user_id)
+        home_formation, home_cards, home_slot_pos, home_slot_names = await _get_squad_cards(session, match.home_user_id)
+        away_formation, away_cards, away_slot_pos, away_slot_names = await _get_squad_cards(session, match.away_user_id)
 
         if not home_cards or not away_cards:
             return False
@@ -291,12 +299,10 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         await asyncio.sleep(1)
 
         # Вычисляем химию для обеих команд
-        _home_slot_names = home_slot_pos or []
         _home_players = [p for _, p in home_cards]
-        _away_slot_names = away_slot_pos or []
         _away_players = [p for _, p in away_cards]
-        home_chem = compute_team_chemistry(home_formation, _home_slot_names, _home_players)
-        away_chem = compute_team_chemistry(away_formation, _away_slot_names, _away_players)
+        home_chem = compute_team_chemistry(home_formation, home_slot_names, _home_players)
+        away_chem = compute_team_chemistry(away_formation, away_slot_names, _away_players)
 
         result = simulate_match(home_formation, home_cards, away_formation, away_cards, home_slot_pos, away_slot_pos, home_chem=home_chem, away_chem=away_chem)
         # Маппинг card_id → owner для комментатора
@@ -594,13 +600,17 @@ async def auto_announce_results(bot: Bot) -> None:
         await asyncio.sleep(1)
 
         for match in unplayed:
-            home_formation, home_cards, home_slot_pos = await _get_squad_cards(session, match.home_user_id)
-            away_formation, away_cards, away_slot_pos = await _get_squad_cards(session, match.away_user_id)
+            home_formation, home_cards, home_slot_pos, home_slot_names = await _get_squad_cards(session, match.home_user_id)
+            away_formation, away_cards, away_slot_pos, away_slot_names = await _get_squad_cards(session, match.away_user_id)
 
             if not home_cards or not away_cards:
                 continue
 
-            sim_result = simulate_match(home_formation, home_cards, away_formation, away_cards, home_slot_pos, away_slot_pos)
+            _home_players = [p for _, p in home_cards]
+            _away_players = [p for _, p in away_cards]
+            home_chem = compute_team_chemistry(home_formation, home_slot_names, _home_players)
+            away_chem = compute_team_chemistry(away_formation, away_slot_names, _away_players)
+            sim_result = simulate_match(home_formation, home_cards, away_formation, away_cards, home_slot_pos, away_slot_pos, home_chem=home_chem, away_chem=away_chem)
             events_data = events_to_dict(sim_result.events)
 
             match.home_goals = sim_result.home_goals

@@ -934,62 +934,64 @@ function selectFormation(f) {
 }
 
 // ─── Chemistry ────────────────────────────────────────────────────────────────
+// FUT-style adjacency graphs (hardcoded from data/fut_formation_graphs.json)
+const FORMATION_EDGES = {
+  '4-4-2': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','LM'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM2'],['RB','RM'],['LM','CM1'],['LM','ST1'],['CM1','CM2'],['CM1','ST1'],['CM2','RM'],['CM2','ST2'],['RM','ST2'],['ST1','ST2']],
+  '4-3-3': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['LB','LW'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM3'],['RB','CM3'],['RB','RW'],['CM1','CM2'],['CM1','LW'],['CM2','CM3'],['CM2','ST'],['CM3','RW'],['LW','ST'],['ST','RW']],
+  '3-5-2': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['CB1','CB2'],['CB1','LM'],['CB1','CDM1'],['CB2','CB3'],['CB2','CDM1'],['CB2','CM'],['CB2','CDM2'],['CB3','CDM2'],['CB3','RM'],['LM','CDM1'],['LM','ST1'],['CDM1','CM'],['CM','CDM2'],['CM','ST1'],['CM','ST2'],['CDM2','RM'],['RM','ST2'],['ST1','ST2']],
+  '5-3-2': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CM1'],['CB2','CB3'],['CB2','CDM'],['CB3','RB'],['CB3','CM2'],['RB','CM2'],['CM1','CM2'],['CM1','CDM'],['CM1','ST1'],['CM2','CDM'],['CM2','ST2'],['CDM','ST1'],['CDM','ST2'],['ST1','ST2']],
+  '4-2-3-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CDM1'],['LB','LM'],['CB1','CB2'],['CB1','CDM1'],['CB2','RB'],['CB2','CDM2'],['RB','CDM2'],['RB','RM'],['CDM1','CDM2'],['CDM1','LM'],['CDM1','CAM'],['CDM2','RM'],['CDM2','CAM'],['LM','CAM'],['LM','ST'],['CAM','RM'],['CAM','ST'],['RM','ST']],
+  '4-1-4-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','LM'],['CB1','CB2'],['CB1','CDM'],['CB1','CM1'],['CB2','RB'],['CB2','CDM'],['CB2','CM2'],['RB','RM'],['CDM','CM1'],['CDM','CM2'],['LM','CM1'],['LM','ST'],['CM1','CM2'],['CM1','ST'],['CM2','RM'],['CM2','ST'],['RM','ST']],
+  '4-5-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','LM'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM3'],['RB','RM'],['LM','CM1'],['LM','ST'],['CM1','CM2'],['CM2','CM3'],['CM2','ST'],['CM3','RM'],['CM3','ST'],['RM','ST']],
+  '3-4-3': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['CB1','CB2'],['CB1','LM'],['CB1','CM1'],['CB2','CB3'],['CB2','CM1'],['CB2','CM2'],['CB2','ST'],['CB3','RM'],['CB3','CM2'],['LM','CM1'],['LM','LW'],['CM1','CM2'],['CM1','LW'],['CM1','ST'],['CM2','RM'],['CM2','RW'],['CM2','ST'],['RM','RW'],['LW','ST'],['ST','RW']],
+  '4-3-3 (4)': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['LB','LW'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM2'],['RB','CAM'],['RB','RW'],['CM1','CM2'],['CM1','LW'],['CM1','CAM'],['CM2','CAM'],['CM2','ST'],['CAM','LW'],['CAM','ST'],['CAM','RW'],['LW','ST'],['ST','RW']],
+  '4-1-2-1-2': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CDM'],['CB1','CM1'],['CB2','RB'],['CB2','CDM'],['CB2','CM2'],['RB','CM2'],['CDM','CM1'],['CDM','CM2'],['CDM','CAM'],['CM1','CAM'],['CM1','ST1'],['CM2','CAM'],['CM2','ST2'],['CAM','ST1'],['CAM','ST2'],['ST1','ST2']],
+  '4-2-2-2': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CDM1'],['LB','CAM1'],['CB1','CB2'],['CB1','CDM1'],['CB2','RB'],['CB2','CDM2'],['RB','CDM2'],['RB','CAM2'],['CDM1','CDM2'],['CDM1','CAM1'],['CDM2','CAM2'],['CAM1','CAM2'],['CAM1','ST1'],['CAM2','ST2'],['ST1','ST2']],
+  '4-2-1-3': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CDM1'],['LB','LW'],['CB1','CB2'],['CB1','CDM1'],['CB2','RB'],['CB2','CDM2'],['RB','CDM2'],['RB','RW'],['CDM1','CDM2'],['CDM1','CAM'],['CDM1','LW'],['CDM2','CAM'],['CDM2','RW'],['CAM','LW'],['CAM','ST'],['CAM','RW'],['LW','ST'],['ST','RW']],
+  '4-2-4': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['LB','LW'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM2'],['RB','CM2'],['RB','RW'],['CM1','CM2'],['CM1','LW'],['CM1','ST1'],['CM2','RW'],['CM2','ST2'],['LW','ST1'],['ST1','ST2'],['ST2','RW']],
+  '4-3-2-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM3'],['RB','CM3'],['CM1','CM2'],['CM1','ST1'],['CM2','CM3'],['CM2','ST1'],['CM2','ST2'],['CM2','ST3'],['CM3','ST3'],['ST1','ST2'],['ST2','ST3']],
+};
+
 function getSlotNeighbors(form) {
-  const layout = FORMATIONS[form];
-  if (!layout) return {};
-  const coords = {};
-  layout.forEach((row, rowIdx) => {
-    const n = row.length;
-    row.forEach((slot, colIdx) => {
-      coords[slot] = [rowIdx, (n > 1 ? colIdx / (n - 1) : 0.5) * 2];
-    });
-  });
+  const edges = FORMATION_EDGES[form];
+  if (!edges) return {};
   const neighbors = {};
-  const slots = Object.keys(coords);
-  for (const s of slots) neighbors[s] = new Set();
-  for (let i = 0; i < slots.length; i++) {
-    for (let j = i + 1; j < slots.length; j++) {
-      const [r1, c1] = coords[slots[i]];
-      const [r2, c2] = coords[slots[j]];
-      const dist = Math.sqrt((r1 - r2) ** 2 + (c1 - c2) ** 2);
-      if (dist <= 2.1) {
-        neighbors[slots[i]].add(slots[j]);
-        neighbors[slots[j]].add(slots[i]);
-      }
-    }
+  for (const [a, b] of edges) {
+    if (!neighbors[a]) neighbors[a] = new Set();
+    if (!neighbors[b]) neighbors[b] = new Set();
+    neighbors[a].add(b);
+    neighbors[b].add(a);
   }
   return neighbors;
 }
 
 function linkStrength(cardA, cardB) {
   if (!cardA || !cardB) return 0;
-  if (cardA.club && cardB.club && cardA.club === cardB.club) return 3;
+  if (cardA.club && cardB.club && cardA.club === cardB.club) return 5;
   const sameNation = cardA.nationality && cardB.nationality && cardA.nationality === cardB.nationality;
   const sameLeague = cardA.league_name && cardB.league_name && cardA.league_name === cardB.league_name;
-  if (sameNation && sameLeague) return 3;
-  if (sameNation || sameLeague) return 2;
+  if (sameNation && sameLeague) return 5;
+  if (sameNation || sameLeague) return 2.5;
   return 0;
 }
 
 function computeChemistry() {
   const allSlots = FORMATIONS[formation].flat();
   const neighbors = getSlotNeighbors(formation);
-  let total = 0, maxPossible = 0;
+  let total = 0;
   for (const slot of allSlots) {
     const cardId = squad[slot];
     const card = cardId ? cards.find(c => c.id === cardId) : null;
     if (!card) continue;
     const nbSlots = [...(neighbors[slot] || [])].filter(nb => squad[nb] && cards.find(c => c.id === squad[nb]));
-    if (!nbSlots.length) continue;
-    let playerChem = 0;
+    let raw = 0;
     for (const nb of nbSlots) {
       const nbCard = cards.find(c => c.id === squad[nb]);
-      playerChem += linkStrength(card, nbCard);
+      raw += linkStrength(card, nbCard);
     }
-    total += playerChem;
-    maxPossible += nbSlots.length * 3;
+    total += Math.min(10, raw);
   }
-  return maxPossible > 0 ? Math.round(total / maxPossible * 100) : 0;
+  return Math.round(total / 110 * 100);
 }
 
 function updateChemDisplay() {
@@ -1042,8 +1044,8 @@ function drawChemLinks() {
       const str = linkStrength(cardA, cardB);
 
       let stroke;
-      if (str === 3) stroke = '#6ee7b7';
-      else if (str === 1) stroke = '#ffd166';
+      if (str >= 5) stroke = '#6ee7b7';
+      else if (str >= 2.5) stroke = '#ffd166';
       else stroke = 'rgba(255,255,255,0.55)';
 
       const dx = p2.x - p1.x;
@@ -1056,7 +1058,7 @@ function drawChemLinks() {
       glow.style.left = `${p1.x}px`;
       glow.style.top = `${p1.y}px`;
       glow.style.width = `${length}px`;
-      glow.style.height = `${str >= 3 ? 5 : str >= 1 ? 4 : 3}px`;
+      glow.style.height = `${str >= 5 ? 5 : str >= 2.5 ? 4 : 3}px`;
       glow.style.background = stroke;
       glow.style.transform = `translateY(-50%) rotate(${angle}deg)`;
       overlay.appendChild(glow);
@@ -1066,7 +1068,7 @@ function drawChemLinks() {
       line.style.left = `${p1.x}px`;
       line.style.top = `${p1.y}px`;
       line.style.width = `${length}px`;
-      line.style.height = `${str >= 3 ? 2.5 : str >= 1 ? 2 : 1.5}px`;
+      line.style.height = `${str >= 5 ? 2.5 : str >= 2.5 ? 2 : 1.5}px`;
       line.style.background = stroke;
       line.style.opacity = '0.95';
       line.style.transform = `translateY(-50%) rotate(${angle}deg)`;
