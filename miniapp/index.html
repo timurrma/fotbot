@@ -127,14 +127,12 @@
     color: var(--green-light);
     background: rgba(82,183,136,0.1);
   }
-  /* Chemistry SVG overlay — под карточками */
+  /* Chemistry SVG overlay — поверх поля, под карточками по z-index */
   .pitch-svg-overlay {
     position: absolute;
     top: 0; left: 0;
-    width: 100%;
-    height: 100%;
     pointer-events: none;
-    z-index: 0;
+    z-index: 5;
     overflow: visible;
   }
 
@@ -151,7 +149,7 @@
     border: 1px solid rgba(255,255,255,0.05);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 14px;
   }
 
   .pitch-row {
@@ -950,8 +948,9 @@ function drawChemLinks() {
   if (!svg) return;
   svg.innerHTML = '';
 
-  const W = pitchEl.offsetWidth;
-  const H = pitchEl.offsetHeight;
+  const container = pitchEl.parentElement;
+  const W = container.offsetWidth;
+  const H = container.offsetHeight;
   svg.setAttribute('width', W);
   svg.setAttribute('height', H);
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -959,23 +958,17 @@ function drawChemLinks() {
   const neighbors = getSlotNeighbors(formation);
   const allSlots = FORMATIONS[formation].flat();
 
-  // Центры аватарок относительно pitch через offsetLeft/offsetTop
+  // Центры аватарок относительно pitch-container
+  const containerRect = container.getBoundingClientRect();
   const slotCenters = {};
   for (const slot of allSlots) {
     const slotEl = pitchEl.querySelector(`[data-slot="${slot}"]`);
     if (!slotEl) continue;
     const avatarEl = slotEl.querySelector('.slot-avatar') || slotEl;
-    // offsetLeft/Top относительно pitchEl
-    let ox = 0, oy = 0;
-    let el = avatarEl;
-    while (el && el !== pitchEl) {
-      ox += el.offsetLeft;
-      oy += el.offsetTop;
-      el = el.offsetParent;
-    }
+    const r = avatarEl.getBoundingClientRect();
     slotCenters[slot] = {
-      x: ox + avatarEl.offsetWidth / 2,
-      y: oy + avatarEl.offsetHeight / 2,
+      x: r.left + r.width / 2 - containerRect.left,
+      y: r.top + r.height / 2 - containerRect.top,
     };
   }
 
@@ -1005,7 +998,7 @@ function drawChemLinks() {
       line.setAttribute('x2', p2.x);
       line.setAttribute('y2', p2.y);
       line.setAttribute('stroke', stroke);
-      line.setAttribute('stroke-width', str >= 3 ? 2.5 : str >= 1 ? 1.5 : 1);
+      line.setAttribute('stroke-width', str >= 3 ? 3.5 : str >= 1 ? 2.5 : 1.5);
       if (dasharray) line.setAttribute('stroke-dasharray', dasharray);
       svg.appendChild(line);
     }
@@ -1018,12 +1011,7 @@ function renderPitch() {
   const rows = [...(FORMATIONS[formation] || [])].reverse(); // вратарь снизу
   pitch.innerHTML = '';
 
-  // SVG для линий химии — первым, под карточками
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.id = 'chemSvg';
-  svg.className = 'pitch-svg-overlay';
-  pitch.appendChild(svg);
-
+  // Только ряды карточек — без SVG внутри flex-контейнера
   for (const row of rows) {
     const rowEl = document.createElement('div');
     rowEl.className = 'pitch-row';
@@ -1032,8 +1020,18 @@ function renderPitch() {
     }
     pitch.appendChild(rowEl);
   }
+
+  // SVG — поверх pitch, снаружи flex layout, через pitch-container
+  const container = pitch.parentElement;
+  let svg = document.getElementById('chemSvg');
+  if (!svg) {
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.id = 'chemSvg';
+    svg.className = 'pitch-svg-overlay';
+    container.appendChild(svg);
+  }
+
   updateAvgRating();
-  // Рисуем линии химии после того как DOM обновился
   requestAnimationFrame(() => { drawChemLinks(); });
 }
 
