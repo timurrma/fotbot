@@ -127,26 +127,25 @@
     color: var(--green-light);
     background: rgba(82,183,136,0.1);
   }
-  /* Chemistry SVG overlay */
+  /* Chemistry SVG overlay — под карточками */
   .pitch-svg-overlay {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 2;
+    z-index: 0;
   }
 
   /* ─── Pitch ─── */
   .pitch-container {
-    padding: 0 16px 12px;
+    padding: 0 8px 12px;
     position: relative;
   }
   .pitch {
     background: linear-gradient(180deg, #1b4332 0%, #2d6a4f 50%, #1b4332 100%);
     border-radius: 12px;
     position: relative;
-    padding: 8px;
+    padding: 14px 4px;
     border: 1px solid rgba(255,255,255,0.05);
-    overflow: hidden;
   }
   /* Field lines */
   .pitch::before {
@@ -173,8 +172,8 @@
   .pitch-row {
     display: flex;
     justify-content: center;
-    gap: 6px;
-    margin-bottom: 6px;
+    gap: 4px;
+    margin-bottom: 10px;
   }
   .pitch-row:last-child { margin-bottom: 0; }
 
@@ -184,18 +183,20 @@
     flex-direction: column;
     align-items: center;
     cursor: pointer;
-    width: 58px;
+    width: 68px;
+    position: relative;
+    z-index: 1;
   }
   .slot-avatar {
-    width: 48px;
-    height: 48px;
+    width: 58px;
+    height: 58px;
     border-radius: 50%;
     background: var(--slot-empty);
     border: 2px dashed rgba(255,255,255,0.2);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px;
+    font-size: 22px;
     overflow: visible;
     transition: all 0.2s;
     position: relative;
@@ -233,20 +234,21 @@
   }
   .slot-rating {
     position: absolute;
-    bottom: 0px;
-    right: 0px;
+    bottom: -2px;
+    right: -2px;
     z-index: 10;
-    background: var(--card-bg);
+    background: rgba(15,20,30,0.9);
     border-radius: 6px;
-    font-size: 9px;
-    font-weight: 700;
-    padding: 1px 3px;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 4px;
     color: var(--gold);
+    border: 1px solid rgba(255,255,255,0.1);
   }
   .slot-penalty {
     position: absolute;
-    top: 0px;
-    left: 0px;
+    top: -2px;
+    left: -2px;
     z-index: 10;
     background: #c0392b;
     border-radius: 6px;
@@ -257,22 +259,23 @@
   }
   .slot-label {
     font-size: 9px;
-    color: rgba(255,255,255,0.5);
+    color: rgba(255,255,255,0.6);
     margin-top: 3px;
     text-align: center;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.5px;
   }
   .slot-name {
     font-size: 9px;
-    color: var(--text);
+    color: #fff;
     margin-top: 1px;
     text-align: center;
-    max-width: 56px;
+    max-width: 66px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-weight: 500;
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
   }
 
   /* ─── Player list ─── */
@@ -530,12 +533,11 @@
   </div>
 
   <!-- Pitch -->
-  <div class="pitch-container" style="position:relative;">
+  <div class="pitch-container">
     <div style="display:flex;justify-content:flex-end;padding:4px 8px 0;"><span id="avgRating" style="font-size:13px;color:var(--gold);font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span></div>
-    <div class="pitch" id="pitch" style="position:relative;">
+    <div class="pitch" id="pitch">
       <div class="loading"><div class="spinner"></div> Загрузка...</div>
     </div>
-    <svg class="pitch-svg-overlay" id="chemSvg"></svg>
   </div>
 
   <!-- Hint -->
@@ -959,27 +961,29 @@ function updateChemDisplay() {
 }
 
 function drawChemLinks() {
+  const pitchEl = document.getElementById('pitch');
+  if (!pitchEl) return;
   const svg = document.getElementById('chemSvg');
   if (!svg) return;
   svg.innerHTML = '';
-  const pitchEl = document.getElementById('pitch');
-  if (!pitchEl) return;
 
   const pitchRect = pitchEl.getBoundingClientRect();
-  const svgRect = svg.getBoundingClientRect();
+  svg.setAttribute('width', pitchRect.width);
+  svg.setAttribute('height', pitchRect.height);
 
   const neighbors = getSlotNeighbors(formation);
   const allSlots = FORMATIONS[formation].flat();
 
-  // Собираем центры слотов
+  // Собираем центры аватарок слотов (относительно pitch)
   const slotCenters = {};
   for (const slot of allSlots) {
-    const el = pitchEl.querySelector(`[data-slot="${slot}"]`);
-    if (!el) continue;
-    const r = el.getBoundingClientRect();
+    const slotEl = pitchEl.querySelector(`[data-slot="${slot}"]`);
+    if (!slotEl) continue;
+    const avatarEl = slotEl.querySelector('.slot-avatar') || slotEl;
+    const r = avatarEl.getBoundingClientRect();
     slotCenters[slot] = {
-      x: r.left + r.width / 2 - svgRect.left,
-      y: r.top + r.height / 2 - svgRect.top,
+      x: r.left + r.width / 2 - pitchRect.left,
+      y: r.top + r.height / 2 - pitchRect.top,
     };
   }
 
@@ -1021,6 +1025,12 @@ function renderPitch() {
   const pitch = document.getElementById('pitch');
   const rows = [...(FORMATIONS[formation] || [])].reverse(); // вратарь снизу
   pitch.innerHTML = '';
+
+  // SVG для линий химии — первым, под карточками
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'chemSvg';
+  svg.className = 'pitch-svg-overlay';
+  pitch.appendChild(svg);
 
   for (const row of rows) {
     const rowEl = document.createElement('div');
