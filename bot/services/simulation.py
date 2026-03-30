@@ -97,12 +97,15 @@ def get_slot_neighbors(formation: str) -> dict[str, set[str]]:
         return {}
 
     # Вычисляем координаты каждого слота
+    # Шаг col = 1.0 между соседними в ряду (независимо от числа игроков).
+    # Порог 1.6: соседние в ряду (dist=1.0) ✓, через одного (dist=2.0) ✗,
+    # смежные ряды рядом (dist≈1.0-1.4) ✓, далёкие по диагонали (dist≈1.8+) ✗
     coords: dict[str, tuple[float, float]] = {}
     for row_idx, row in enumerate(layout):
         n = len(row)
+        center = (n - 1) / 2.0
         for col_idx, slot in enumerate(row):
-            col_norm = col_idx / (n - 1) if n > 1 else 0.5
-            coords[slot] = (float(row_idx), col_norm * 3.0)
+            coords[slot] = (float(row_idx), float(col_idx) - center)
 
     # Определяем соседей
     neighbors: dict[str, set[str]] = {slot: set() for slot in coords}
@@ -112,7 +115,7 @@ def get_slot_neighbors(formation: str) -> dict[str, set[str]]:
             r1, c1 = coords[s1]
             r2, c2 = coords[s2]
             dist = math.sqrt((r1 - r2) ** 2 + (c1 - c2) ** 2)
-            if dist <= 1.5:
+            if dist <= 1.6:
                 neighbors[s1].add(s2)
                 neighbors[s2].add(s1)
     return neighbors
@@ -149,17 +152,18 @@ def compute_team_chemistry(
         return 0
 
     total_chem = 0
+    max_possible = 0
     for slot, player in slot_to_player.items():
         if player.id < 0:
             continue
-        player_chem = 0
-        for nb_slot in neighbors.get(slot, set()):
-            nb_player = slot_to_player.get(nb_slot)
-            if nb_player:
-                player_chem += link_strength(player, nb_player)
-        total_chem += min(10, player_chem)
+        nb_slots = [s for s in neighbors.get(slot, set()) if slot_to_player.get(s)]
+        if not nb_slots:
+            continue
+        player_chem = sum(link_strength(player, slot_to_player[nb]) for nb in nb_slots)
+        player_max = len(nb_slots) * 3
+        total_chem += player_chem
+        max_possible += player_max
 
-    max_possible = len([p for p in players if p.id >= 0]) * 10
     if max_possible == 0:
         return 0.0
     return round(total_chem / max_possible * 100, 1)

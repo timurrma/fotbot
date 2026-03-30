@@ -941,7 +941,7 @@ function getSlotNeighbors(form) {
   layout.forEach((row, rowIdx) => {
     const n = row.length;
     row.forEach((slot, colIdx) => {
-      coords[slot] = [rowIdx, (n > 1 ? colIdx / (n - 1) : 0.5) * 3];
+      coords[slot] = [rowIdx, (n > 1 ? colIdx / (n - 1) : 0.5) * 2];
     });
   });
   const neighbors = {};
@@ -952,7 +952,7 @@ function getSlotNeighbors(form) {
       const [r1, c1] = coords[slots[i]];
       const [r2, c2] = coords[slots[j]];
       const dist = Math.sqrt((r1 - r2) ** 2 + (c1 - c2) ** 2);
-      if (dist <= 1.5) {
+      if (dist <= 2.1) {
         neighbors[slots[i]].add(slots[j]);
         neighbors[slots[j]].add(slots[i]);
       }
@@ -974,21 +974,22 @@ function linkStrength(cardA, cardB) {
 function computeChemistry() {
   const allSlots = FORMATIONS[formation].flat();
   const neighbors = getSlotNeighbors(formation);
-  let total = 0, count = 0;
+  let total = 0, maxPossible = 0;
   for (const slot of allSlots) {
     const cardId = squad[slot];
     const card = cardId ? cards.find(c => c.id === cardId) : null;
     if (!card) continue;
+    const nbSlots = [...(neighbors[slot] || [])].filter(nb => squad[nb] && cards.find(c => c.id === squad[nb]));
+    if (!nbSlots.length) continue;
     let playerChem = 0;
-    for (const nb of (neighbors[slot] || [])) {
-      const nbCardId = squad[nb];
-      const nbCard = nbCardId ? cards.find(c => c.id === nbCardId) : null;
+    for (const nb of nbSlots) {
+      const nbCard = cards.find(c => c.id === squad[nb]);
       playerChem += linkStrength(card, nbCard);
     }
-    total += Math.min(10, playerChem);
-    count++;
+    total += playerChem;
+    maxPossible += nbSlots.length * 3;
   }
-  return count > 0 ? Math.round(total / (count * 10) * 100) : 0;
+  return maxPossible > 0 ? Math.round(total / maxPossible * 100) : 0;
 }
 
 function updateChemDisplay() {
