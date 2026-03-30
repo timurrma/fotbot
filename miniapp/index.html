@@ -786,6 +786,7 @@ async function init() {
 
   renderFormationTabs();
   await Promise.all([loadCards(), loadSquad(), loadLastPack()]);
+  renderFormationTabs();
   // Матчим player_id пака с card_id коллекции
   if (window._lastPackPlayerIds) {
     lastPackIds = new Set(cards.filter(c => window._lastPackPlayerIds.has(c.player_id)).map(c => c.id));
@@ -798,6 +799,7 @@ async function init() {
 // ─── API ──────────────────────────────────────────────────────────────────────
 async function reloadData() {
   await Promise.all([loadCards(), loadSquad()]);
+  renderFormationTabs();
   renderPitch();
   renderPlayerList();
 }
@@ -838,6 +840,7 @@ async function loadSquad() {
     for (const [slot, cardId] of Object.entries(data.slots || {})) {
       squad[slot] = Number(cardId);
     }
+    renderFormationTabs();
   } catch(e) {
     // ignore, start fresh
   }
