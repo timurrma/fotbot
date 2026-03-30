@@ -28,6 +28,7 @@ class Player(Base):
     overall_rating: Mapped[int] = mapped_column(Integer, nullable=False)
     photo_url: Mapped[Optional[str]] = mapped_column(Text)
     league_id: Mapped[Optional[int]] = mapped_column(Integer)
+    league_name: Mapped[Optional[str]] = mapped_column(String(100))
     is_national_team: Mapped[bool] = mapped_column(Boolean, default=False)
 
     @property

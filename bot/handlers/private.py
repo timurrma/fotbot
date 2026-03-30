@@ -1,5 +1,6 @@
 """Команды в личных сообщениях."""
 import asyncio
+import random
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import Message
@@ -64,6 +65,20 @@ async def cmd_start(message: Message) -> None:
         username = message.from_user.username or message.from_user.full_name
         await send_pack_with_photos(message.bot, message.chat.id, username, players, "starter")
         await send_pack_with_photos(message.bot, settings.group_id, username, players, "starter")
+
+        # Бонус: 4 пака одной случайной нации
+        nation_pack = random.choice(["russia", "brazil", "france", "england", "turkey", "saudi"])
+        nation_names = {
+            "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия",
+            "france": "🇫🇷 Франция", "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Англия",
+            "turkey": "🇹🇷 Турция", "saudi": "🇸🇦 Саудовская Аравия",
+        }
+        await message.answer(f"🎁 Бонус: 4 пака {nation_names[nation_pack]}!")
+        async with AsyncSessionLocal() as session:
+            for _ in range(4):
+                nation_players = await open_pack(session, message.from_user.id, pack_type=nation_pack)
+                await send_pack_with_photos(message.bot, message.chat.id, username, nation_players, nation_pack)
+                await asyncio.sleep(1)
     else:
         await message.answer(
             "👋 С возвращением!\n\n"

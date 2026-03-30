@@ -7,6 +7,7 @@
 3. Для каждого гола — выбираем автора и ассистента по вероятностям позиции
 4. Собираем список событий для LLM-комментатора
 """
+import math
 import random
 from dataclasses import dataclass, field
 from typing import Optional
@@ -58,7 +59,110 @@ FORMATIONS_SLOTS: dict[str, list[str]] = {
     "4-1-4-1": ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "LM", "RM", "ST"],
     "4-5-1": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "LM", "RM", "ST"],
     "3-4-3": ["GK", "CB", "CB", "CB", "LM", "CM", "CM", "RM", "LW", "ST", "RW"],
+    "4-3-3 (4)": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CAM", "LW", "RW", "ST"],
+    "4-1-2-1-2": ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "CAM", "ST", "ST"],
+    "4-2-2-2": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "CAM", "ST", "ST"],
+    "4-2-1-3": ["GK", "CB", "CB", "LB", "RB", "CDM", "CDM", "CAM", "LW", "RW", "ST"],
+    "4-2-4": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "LW", "RW", "ST", "ST"],
+    "4-3-2-1": ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CM", "ST", "ST", "ST"],
 }
+
+# Структура формаций для расчёта химии (ряды слотов, снизу вверх: GK → атака)
+# Используется для вычисления координат и соседей каждого слота
+FORMATIONS_LAYOUT: dict[str, list[list[str]]] = {
+    "4-4-2": [["GK"], ["LB", "CB1", "CB2", "RB"], ["LM", "CM1", "CM2", "RM"], ["ST1", "ST2"]],
+    "4-3-3": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM", "CM1", "CM2"], ["LW", "ST", "RW"]],
+    "3-5-2": [["GK"], ["CB1", "CB2", "CB3"], ["LM", "CDM", "CM1", "CM2", "RM"], ["ST1", "ST2"]],
+    "5-3-2": [["GK"], ["LB", "CB1", "CB2", "CB3", "RB"], ["CDM", "CM1", "CM2"], ["ST1", "ST2"]],
+    "4-2-3-1": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM1", "CDM2"], ["LM", "CAM", "RM"], ["ST"]],
+    "4-1-4-1": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM"], ["LM", "CM1", "CM2", "RM"], ["ST"]],
+    "4-5-1": [["GK"], ["LB", "CB1", "CB2", "RB"], ["LM", "CM1", "CM2", "CM3", "RM"], ["ST"]],
+    "3-4-3": [["GK"], ["CB1", "CB2", "CB3"], ["LM", "CM1", "CM2", "RM"], ["LW", "ST", "RW"]],
+    "4-3-3 (4)": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CM1", "CM2", "CAM"], ["LW", "ST", "RW"]],
+    "4-1-2-1-2": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM"], ["CM1", "CM2"], ["CAM"], ["ST1", "ST2"]],
+    "4-2-2-2": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM1", "CDM2"], ["CAM1", "CAM2"], ["ST1", "ST2"]],
+    "4-2-1-3": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CDM1", "CDM2"], ["CAM"], ["LW", "ST", "RW"]],
+    "4-2-4": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CM1", "CM2"], ["LW", "ST1", "ST2", "RW"]],
+    "4-3-2-1": [["GK"], ["LB", "CB1", "CB2", "RB"], ["CM1", "CM2", "CM3"], ["ST1", "ST2", "ST3"]],
+}
+
+
+def get_slot_neighbors(formation: str) -> dict[str, set[str]]:
+    """
+    Возвращает словарь {slot_name: set of neighbor slot_names} для заданной формации.
+    Соседи — слоты с Евклидовым расстоянием ≤ 1.5 (row-нормализованное + col*3).
+    """
+    layout = FORMATIONS_LAYOUT.get(formation)
+    if not layout:
+        return {}
+
+    # Вычисляем координаты каждого слота
+    coords: dict[str, tuple[float, float]] = {}
+    for row_idx, row in enumerate(layout):
+        n = len(row)
+        for col_idx, slot in enumerate(row):
+            col_norm = col_idx / (n - 1) if n > 1 else 0.5
+            coords[slot] = (float(row_idx), col_norm * 3.0)
+
+    # Определяем соседей
+    neighbors: dict[str, set[str]] = {slot: set() for slot in coords}
+    slots = list(coords.keys())
+    for i, s1 in enumerate(slots):
+        for s2 in slots[i + 1:]:
+            r1, c1 = coords[s1]
+            r2, c2 = coords[s2]
+            dist = math.sqrt((r1 - r2) ** 2 + (c1 - c2) ** 2)
+            if dist <= 1.5:
+                neighbors[s1].add(s2)
+                neighbors[s2].add(s1)
+    return neighbors
+
+
+def compute_team_chemistry(
+    formation: str,
+    slot_names: list[str],
+    players: list[Player],
+) -> float:
+    """
+    Вычисляет химию команды 0-100.
+    slot_names[i] и players[i] — слот и игрок в нём.
+    Возвращает team_chem: float 0-100.
+    """
+    if not players or not formation:
+        return 0.0
+
+    neighbors = get_slot_neighbors(formation)
+    slot_to_player: dict[str, Player] = dict(zip(slot_names, players))
+
+    def link_strength(a: Player, b: Player) -> int:
+        if a.id < 0 or b.id < 0:
+            return 0
+        same_club = bool(a.club and b.club and a.club == b.club)
+        same_nation = bool(a.nationality and b.nationality and a.nationality == b.nationality)
+        same_league = bool(a.league_name and b.league_name and a.league_name == b.league_name)
+        if same_club:
+            return 3
+        if same_nation and same_league:
+            return 3
+        if same_nation or same_league:
+            return 1
+        return 0
+
+    total_chem = 0
+    for slot, player in slot_to_player.items():
+        if player.id < 0:
+            continue
+        player_chem = 0
+        for nb_slot in neighbors.get(slot, set()):
+            nb_player = slot_to_player.get(nb_slot)
+            if nb_player:
+                player_chem += link_strength(player, nb_player)
+        total_chem += min(10, player_chem)
+
+    max_possible = len([p for p in players if p.id >= 0]) * 10
+    if max_possible == 0:
+        return 0.0
+    return round(total_chem / max_possible * 100, 1)
 
 
 @dataclass
@@ -466,16 +570,19 @@ def simulate_match(
     away_cards: list[tuple[int, Player]],
     home_slot_positions: Optional[list] = None,
     away_slot_positions: Optional[list] = None,
+    home_chem: float = 50.0,
+    away_chem: float = 50.0,
 ) -> MatchResult:
     """
     Основная функция симуляции матча.
     Принимает составы двух команд, возвращает MatchResult.
+    home_chem/away_chem — химия 0-100, даёт бонус до +3 к силе команды.
     """
     home_lineup = build_lineup(home_formation, home_cards, home_slot_positions)
     away_lineup = build_lineup(away_formation, away_cards, away_slot_positions)
 
-    h_str = team_strength(home_lineup)
-    a_str = team_strength(away_lineup)
+    h_str = team_strength(home_lineup) + (home_chem / 100) * 3.0
+    a_str = team_strength(away_lineup) + (away_chem / 100) * 3.0
 
     h_lam, a_lam = expected_goals(h_str, a_str)
 

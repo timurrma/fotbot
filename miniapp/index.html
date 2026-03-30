@@ -62,15 +62,53 @@
   .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   .save-btn:active { opacity: 0.7; }
 
-  /* ─── Formation tabs ─── */
+  /* ─── Formation picker ─── */
   .formation-row {
     display: flex;
-    gap: 8px;
-    padding: 12px 16px;
-    overflow-x: auto;
-    scrollbar-width: none;
+    align-items: center;
+    padding: 8px 16px;
+    gap: 12px;
   }
-  .formation-row::-webkit-scrollbar { display: none; }
+  .formation-btn {
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1.5px solid var(--green-light);
+    background: rgba(82,183,136,0.1);
+    color: var(--green-light);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  /* Formation modal */
+  .formation-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .formation-modal-overlay.open { display: flex; }
+  .formation-modal {
+    background: #1a2332;
+    border-radius: 16px;
+    padding: 20px;
+    width: 280px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  .formation-modal h3 {
+    margin: 0 0 14px;
+    font-size: 15px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+  .formation-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
   .f-tab {
     flex-shrink: 0;
     padding: 6px 14px;
@@ -82,11 +120,19 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    text-align: center;
   }
   .f-tab.active {
     border-color: var(--green-light);
     color: var(--green-light);
     background: rgba(82,183,136,0.1);
+  }
+  /* Chemistry SVG overlay */
+  .pitch-svg-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
   }
 
   /* ─── Pitch ─── */
@@ -467,17 +513,29 @@
   <button id="tab-opponent" onclick="switchTab('opponent')">👥 Соперник</button>
 </div>
 
+<!-- Formation modal -->
+<div class="formation-modal-overlay" id="formationModalOverlay" onclick="if(event.target===this)closeFormationModal()">
+  <div class="formation-modal">
+    <h3>Выбери тактику</h3>
+    <div class="formation-grid" id="formationGrid"></div>
+  </div>
+</div>
+
 <!-- ── SQUAD TAB ── -->
 <div id="page-squad">
-  <!-- Formation tabs -->
-  <div class="formation-row" id="formationRow"></div>
+  <!-- Formation picker -->
+  <div class="formation-row">
+    <button class="formation-btn" id="formationPickerBtn" onclick="openFormationModal()">4-4-2 ▾</button>
+    <span id="chemDisplay" style="font-size:13px;font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span>
+  </div>
 
   <!-- Pitch -->
-  <div class="pitch-container">
+  <div class="pitch-container" style="position:relative;">
     <div style="display:flex;justify-content:flex-end;padding:4px 8px 0;"><span id="avgRating" style="font-size:13px;color:var(--gold);font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span></div>
-    <div class="pitch" id="pitch">
+    <div class="pitch" id="pitch" style="position:relative;">
       <div class="loading"><div class="spinner"></div> Загрузка...</div>
     </div>
+    <svg class="pitch-svg-overlay" id="chemSvg"></svg>
   </div>
 
   <!-- Hint -->
@@ -574,6 +632,46 @@ const FORMATIONS = {
     ['LM', 'CM1', 'CM2', 'RM'],
     ['LW', 'ST', 'RW'],
   ],
+  '4-3-3 (4)': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'RB'],
+    ['CM1', 'CM2', 'CAM'],
+    ['LW', 'ST', 'RW'],
+  ],
+  '4-1-2-1-2': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'RB'],
+    ['CDM'],
+    ['CM1', 'CM2'],
+    ['CAM'],
+    ['ST1', 'ST2'],
+  ],
+  '4-2-2-2': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'RB'],
+    ['CDM1', 'CDM2'],
+    ['CAM1', 'CAM2'],
+    ['ST1', 'ST2'],
+  ],
+  '4-2-1-3': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'RB'],
+    ['CDM1', 'CDM2'],
+    ['CAM'],
+    ['LW', 'ST', 'RW'],
+  ],
+  '4-2-4': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'RB'],
+    ['CM1', 'CM2'],
+    ['LW', 'ST1', 'ST2', 'RW'],
+  ],
+  '4-3-2-1': [
+    ['GK'],
+    ['LB', 'CB1', 'CB2', 'RB'],
+    ['CM1', 'CM2', 'CM3'],
+    ['ST1', 'ST2', 'ST3'],
+  ],
 };
 
 // Which slot names map to which position group
@@ -584,9 +682,9 @@ const SLOT_POSITION = {
   CDM: 'CDM', CDM1: 'CDM', CDM2: 'CDM',
   LM: 'LM', RM: 'RM',
   CM: 'CM', CM1: 'CM', CM2: 'CM', CM3: 'CM',
-  CAM: 'CAM',
+  CAM: 'CAM', CAM1: 'CAM', CAM2: 'CAM',
   LW: 'LW', RW: 'RW',
-  ST: 'ST', ST1: 'ST', ST2: 'ST',
+  ST: 'ST', ST1: 'ST', ST2: 'ST', ST3: 'ST',
 };
 
 // Зоны позиций (как в simulation.py)
@@ -760,17 +858,26 @@ async function saveSquad() {
   btn.textContent = 'Сохранить';
 }
 
-// ─── Formation tabs ───────────────────────────────────────────────────────────
-function renderFormationTabs() {
-  const row = document.getElementById('formationRow');
-  row.innerHTML = '';
+// ─── Formation modal ──────────────────────────────────────────────────────────
+function openFormationModal() {
+  const grid = document.getElementById('formationGrid');
+  grid.innerHTML = '';
   for (const f of Object.keys(FORMATIONS)) {
     const btn = document.createElement('button');
     btn.className = 'f-tab' + (f === formation ? ' active' : '');
     btn.textContent = f;
-    btn.onclick = () => selectFormation(f);
-    row.appendChild(btn);
+    btn.onclick = () => { selectFormation(f); closeFormationModal(); };
+    grid.appendChild(btn);
   }
+  document.getElementById('formationModalOverlay').classList.add('open');
+}
+
+function closeFormationModal() {
+  document.getElementById('formationModalOverlay').classList.remove('open');
+}
+
+function renderFormationTabs() {
+  document.getElementById('formationPickerBtn').textContent = formation + ' ▾';
 }
 
 function selectFormation(f) {
@@ -781,6 +888,132 @@ function selectFormation(f) {
   renderPitch();
   renderPlayerList();
   setHint(false);
+}
+
+// ─── Chemistry ────────────────────────────────────────────────────────────────
+function getSlotNeighbors(form) {
+  const layout = FORMATIONS[form];
+  if (!layout) return {};
+  const coords = {};
+  layout.forEach((row, rowIdx) => {
+    const n = row.length;
+    row.forEach((slot, colIdx) => {
+      coords[slot] = [rowIdx, (n > 1 ? colIdx / (n - 1) : 0.5) * 3];
+    });
+  });
+  const neighbors = {};
+  const slots = Object.keys(coords);
+  for (const s of slots) neighbors[s] = new Set();
+  for (let i = 0; i < slots.length; i++) {
+    for (let j = i + 1; j < slots.length; j++) {
+      const [r1, c1] = coords[slots[i]];
+      const [r2, c2] = coords[slots[j]];
+      const dist = Math.sqrt((r1 - r2) ** 2 + (c1 - c2) ** 2);
+      if (dist <= 1.5) {
+        neighbors[slots[i]].add(slots[j]);
+        neighbors[slots[j]].add(slots[i]);
+      }
+    }
+  }
+  return neighbors;
+}
+
+function linkStrength(cardA, cardB) {
+  if (!cardA || !cardB) return 0;
+  if (cardA.club && cardB.club && cardA.club === cardB.club) return 3;
+  const sameNation = cardA.nationality && cardB.nationality && cardA.nationality === cardB.nationality;
+  const sameLeague = cardA.league_name && cardB.league_name && cardA.league_name === cardB.league_name;
+  if (sameNation && sameLeague) return 3;
+  if (sameNation || sameLeague) return 1;
+  return 0;
+}
+
+function computeChemistry() {
+  const allSlots = FORMATIONS[formation].flat();
+  const neighbors = getSlotNeighbors(formation);
+  let total = 0, count = 0;
+  for (const slot of allSlots) {
+    const cardId = squad[slot];
+    const card = cardId ? cards.find(c => c.id === cardId) : null;
+    if (!card) continue;
+    let playerChem = 0;
+    for (const nb of (neighbors[slot] || [])) {
+      const nbCardId = squad[nb];
+      const nbCard = nbCardId ? cards.find(c => c.id === nbCardId) : null;
+      playerChem += linkStrength(card, nbCard);
+    }
+    total += Math.min(10, playerChem);
+    count++;
+  }
+  return count > 0 ? Math.round(total / (count * 10) * 100) : 0;
+}
+
+function updateChemDisplay() {
+  const chem = computeChemistry();
+  const el = document.getElementById('chemDisplay');
+  if (!el) return;
+  if (chem === 0) { el.textContent = ''; return; }
+  const color = chem >= 75 ? '#52b788' : chem >= 50 ? '#f0c040' : '#e74c3c';
+  el.style.color = color;
+  el.textContent = `⚗️ ${chem}`;
+}
+
+function drawChemLinks() {
+  const svg = document.getElementById('chemSvg');
+  if (!svg) return;
+  svg.innerHTML = '';
+  const pitchEl = document.getElementById('pitch');
+  if (!pitchEl) return;
+
+  const pitchRect = pitchEl.getBoundingClientRect();
+  const svgRect = svg.getBoundingClientRect();
+
+  const neighbors = getSlotNeighbors(formation);
+  const allSlots = FORMATIONS[formation].flat();
+
+  // Собираем центры слотов
+  const slotCenters = {};
+  for (const slot of allSlots) {
+    const el = pitchEl.querySelector(`[data-slot="${slot}"]`);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    slotCenters[slot] = {
+      x: r.left + r.width / 2 - svgRect.left,
+      y: r.top + r.height / 2 - svgRect.top,
+    };
+  }
+
+  const drawn = new Set();
+  for (const slot of allSlots) {
+    for (const nb of (neighbors[slot] || [])) {
+      const key = [slot, nb].sort().join('|');
+      if (drawn.has(key)) continue;
+      drawn.add(key);
+      const p1 = slotCenters[slot];
+      const p2 = slotCenters[nb];
+      if (!p1 || !p2) continue;
+
+      const cardA = squad[slot] ? cards.find(c => c.id === squad[slot]) : null;
+      const cardB = squad[nb] ? cards.find(c => c.id === squad[nb]) : null;
+      const str = linkStrength(cardA, cardB);
+
+      let stroke, dasharray = '';
+      if (!cardA || !cardB) { stroke = 'rgba(255,255,255,0.15)'; dasharray = '4,4'; }
+      else if (str === 3) stroke = '#52b788';
+      else if (str === 1) stroke = '#f0c040';
+      else stroke = 'rgba(255,255,255,0.2)';
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', p1.x);
+      line.setAttribute('y1', p1.y);
+      line.setAttribute('x2', p2.x);
+      line.setAttribute('y2', p2.y);
+      line.setAttribute('stroke', stroke);
+      line.setAttribute('stroke-width', str >= 3 ? 2.5 : str >= 1 ? 1.5 : 1);
+      if (dasharray) line.setAttribute('stroke-dasharray', dasharray);
+      svg.appendChild(line);
+    }
+  }
 }
 
 // ─── Pitch ────────────────────────────────────────────────────────────────────
@@ -798,6 +1031,8 @@ function renderPitch() {
     pitch.appendChild(rowEl);
   }
   updateAvgRating();
+  // Рисуем линии химии после того как DOM обновился
+  requestAnimationFrame(() => { drawChemLinks(); });
 }
 
 function updateAvgRating() {
@@ -814,6 +1049,7 @@ function updateAvgRating() {
   if (ratings.length === 0) { el.textContent = ''; return; }
   const avg = (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1);
   el.textContent = `★ ${avg}`;
+  updateChemDisplay();
 }
 
 function makeSlotEl(slotName) {
@@ -822,6 +1058,7 @@ function makeSlotEl(slotName) {
 
   const el = document.createElement('div');
   el.className = 'slot' + (card ? ' filled' : '') + (selectedSlot === slotName ? ' selected' : '');
+  el.dataset.slot = slotName;
   el.onclick = () => selectSlot(slotName);
 
   const avatar = document.createElement('div');

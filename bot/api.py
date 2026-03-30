@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from bot.config import settings
 from bot.db.models import UserCard, UserSquad, PackHistory, Player, TransferListing, TransferOffer, Whitelist
 from bot.db.session import AsyncSessionLocal
-from bot.services.simulation import compute_penalty
+from bot.services.simulation import compute_penalty, compute_team_chemistry
 
 _SLOT_TO_POS = {
     "GK": "GK",
@@ -29,9 +29,9 @@ _SLOT_TO_POS = {
     "LB": "LB", "RB": "RB",
     "CDM1": "CDM", "CDM2": "CDM",
     "CM": "CM", "CM1": "CM", "CM2": "CM", "CM3": "CM",
-    "LM": "LM", "RM": "RM", "CAM": "CAM",
+    "LM": "LM", "RM": "RM", "CAM": "CAM", "CAM1": "CAM", "CAM2": "CAM",
     "LW": "LW", "RW": "RW",
-    "ST": "ST", "ST1": "ST", "ST2": "ST",
+    "ST": "ST", "ST1": "ST", "ST2": "ST", "ST3": "ST",
 }
 
 
@@ -45,6 +45,8 @@ def _card_dict_with_penalty(card: UserCard, slot_name: str) -> dict:
         "player_id": p.id,
         "name": p.name,
         "club": p.club,
+        "nationality": p.nationality,
+        "league_name": p.league_name,
         "position": p.position,
         "rating": p.overall_rating,
         "effective_rating": effective,
@@ -137,6 +139,7 @@ async def get_cards(request: web.Request) -> web.Response:
             "photo": c.player.photo_url,
             "national": c.player.is_national_team,
             "nationality": c.player.nationality,
+            "league_name": c.player.league_name,
         }
         for c in cards
     ]

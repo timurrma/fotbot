@@ -20,7 +20,7 @@ from bot.config import settings
 from bot.db.models import Match, MatchStat, Player, Tournament, UserCard, UserSquad, Whitelist
 from bot.db.session import AsyncSessionLocal
 from bot.services.llm_commentator import commentate_match, format_match_summary
-from bot.services.simulation import events_to_dict, simulate_match, FORMATIONS_SLOTS
+from bot.services.simulation import events_to_dict, simulate_match, FORMATIONS_SLOTS, compute_team_chemistry
 
 
 async def _get_squad_cards(
@@ -46,9 +46,9 @@ async def _get_squad_cards(
             "CDM1": "CDM", "CDM2": "CDM",
             "CM": "CM", "CM1": "CM", "CM2": "CM", "CM3": "CM",
             "LM": "LM", "RM": "RM",
-            "CAM": "CAM",
+            "CAM": "CAM", "CAM1": "CAM", "CAM2": "CAM",
             "LW": "LW", "RW": "RW",
-            "ST": "ST", "ST1": "ST", "ST2": "ST",
+            "ST": "ST", "ST1": "ST", "ST2": "ST", "ST3": "ST",
         }
         SLOT_ORDER = ["GK", "CB1", "CB2", "CB3", "LB", "RB",
                       "CDM1", "CDM2", "CM", "CM1", "CM2", "CM3",
@@ -290,7 +290,15 @@ async def play_next_match(bot: Bot, with_commentary: bool = True) -> bool:
         )
         await asyncio.sleep(1)
 
-        result = simulate_match(home_formation, home_cards, away_formation, away_cards, home_slot_pos, away_slot_pos)
+        # Вычисляем химию для обеих команд
+        _home_slot_names = home_slot_pos or []
+        _home_players = [p for _, p in home_cards]
+        _away_slot_names = away_slot_pos or []
+        _away_players = [p for _, p in away_cards]
+        home_chem = compute_team_chemistry(home_formation, _home_slot_names, _home_players)
+        away_chem = compute_team_chemistry(away_formation, _away_slot_names, _away_players)
+
+        result = simulate_match(home_formation, home_cards, away_formation, away_cards, home_slot_pos, away_slot_pos, home_chem=home_chem, away_chem=away_chem)
         # Маппинг card_id → owner для комментатора
         card_owner = {card_id: _home_name for card_id, _ in home_cards}
         card_owner.update({card_id: _away_name for card_id, _ in away_cards})
