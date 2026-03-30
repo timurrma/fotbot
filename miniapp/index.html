@@ -1321,6 +1321,11 @@ function getDupNumber(cardId) {
   return _dupNumbers[cardId] || 1;
 }
 
+function cardMetaText(card) {
+  const parts = [card.position, card.club, card.league_name].filter(Boolean);
+  return parts.join(' · ');
+}
+
 function makeCardEl(card, inSquad, isSelected) {
   const el = document.createElement('div');
   el.className = 'player-card' + (inSquad ? ' in-squad' : '') + (isSelected ? ' selected' : '');
@@ -1349,7 +1354,7 @@ function makeCardEl(card, inSquad, isSelected) {
   name.innerHTML = (flag ? flag + ' ' : '') + card.name + dupSuffix;
   const meta = document.createElement('div');
   meta.className = 'player-meta';
-  meta.textContent = `${card.position} · ${card.club || ''}`;
+  meta.textContent = cardMetaText(card);
   info.appendChild(name);
   info.appendChild(meta);
 
