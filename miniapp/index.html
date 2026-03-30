@@ -153,15 +153,14 @@
     flex-direction: column;
     justify-content: space-evenly;
     gap: 10px;
-    aspect-ratio: 3 / 4;
-    min-height: 440px;
+    height: clamp(360px, 52vh, 520px);
     overflow: hidden;
   }
   .pitch::before {
     content: '';
     position: absolute;
     inset: 12px;
-    border: 2px solid rgba(255,255,255,0.16);
+    border: 2px solid rgba(255,255,255,0.22);
     border-radius: 8px;
     pointer-events: none;
     z-index: 0;
@@ -173,14 +172,30 @@
     pointer-events: none;
     z-index: 0;
     background:
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,0.28) 0 3px, transparent 4px),
+      linear-gradient(rgba(255,255,255,0.22), rgba(255,255,255,0.22)),
+      linear-gradient(rgba(255,255,255,0.22), rgba(255,255,255,0.22)),
       linear-gradient(
         to bottom,
         transparent calc(50% - 1px),
-        rgba(255,255,255,0.16) calc(50% - 1px),
-        rgba(255,255,255,0.16) calc(50% + 1px),
+        rgba(255,255,255,0.24) calc(50% - 1px),
+        rgba(255,255,255,0.24) calc(50% + 1px),
         transparent calc(50% + 1px)
       ),
-      radial-gradient(circle at 50% 50%, transparent 0 12%, rgba(255,255,255,0.16) 12.4% 13%, transparent 13.4%);
+      radial-gradient(circle at 50% 50%, transparent 0 12%, rgba(255,255,255,0.24) 12.4% 13%, transparent 13.4%);
+    background-repeat: no-repeat;
+    background-size:
+      6px 6px,
+      42% 18%,
+      42% 18%,
+      100% 100%,
+      100% 100%;
+    background-position:
+      center,
+      center top 12px,
+      center bottom 12px,
+      center,
+      center;
   }
 
   .pitch-row {
