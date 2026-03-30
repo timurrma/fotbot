@@ -147,17 +147,18 @@
     background: linear-gradient(180deg, #1b4332 0%, #2d6a4f 50%, #1b4332 100%);
     border-radius: 12px;
     position: relative;
-    padding: 10px 4px 10px;
+    padding: 10px 4px;
     border: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .pitch-row {
     display: flex;
     justify-content: center;
-    gap: 2px;
-    margin-bottom: 4px;
+    gap: 4px;
   }
-  .pitch-row:last-child { margin-bottom: 0; }
 
   /* ─── Slot ─── */
   .slot {
