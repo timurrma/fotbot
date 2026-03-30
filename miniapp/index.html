@@ -133,10 +133,11 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 2;
+    z-index: 4;
     overflow: visible;
     width: 100%;
     height: 100%;
+    display: block;
   }
 
   /* ─── Pitch ─── */
@@ -207,7 +208,7 @@
     cursor: pointer;
     width: 60px;
     position: relative;
-    z-index: 3;
+    z-index: 5;
   }
   .slot-avatar {
     width: 52px;
@@ -995,6 +996,7 @@ function drawChemLinks() {
   svg.setAttribute('width', W);
   svg.setAttribute('height', H);
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('preserveAspectRatio', 'none');
 
   const neighbors = getSlotNeighbors(formation);
   const allSlots = FORMATIONS[formation].flat();
@@ -1024,13 +1026,13 @@ function drawChemLinks() {
 
       const cardA = squad[slot] ? cards.find(c => c.id === squad[slot]) : null;
       const cardB = squad[nb] ? cards.find(c => c.id === squad[nb]) : null;
+      if (!cardA || !cardB) continue;
       const str = linkStrength(cardA, cardB);
 
-      let stroke, dasharray = '';
-      if (!cardA || !cardB) { stroke = 'rgba(255,255,255,0.14)'; dasharray = '4,4'; }
-      else if (str === 3) stroke = '#52b788';
-      else if (str === 1) stroke = '#f0c040';
-      else stroke = 'rgba(255,255,255,0.28)';
+      let stroke;
+      if (str === 3) stroke = '#6ee7b7';
+      else if (str === 1) stroke = '#ffd166';
+      else stroke = 'rgba(255,255,255,0.55)';
 
       const glow = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       glow.setAttribute('x1', p1.x);
@@ -1039,8 +1041,8 @@ function drawChemLinks() {
       glow.setAttribute('y2', p2.y);
       glow.setAttribute('stroke', stroke);
       glow.setAttribute('stroke-linecap', 'round');
-      glow.setAttribute('stroke-opacity', cardA && cardB ? '0.35' : '0.2');
-      glow.setAttribute('stroke-width', str >= 3 ? 7 : str >= 1 ? 5 : 3);
+      glow.setAttribute('stroke-opacity', '0.35');
+      glow.setAttribute('stroke-width', str >= 3 ? 5 : str >= 1 ? 4 : 3);
       svg.appendChild(glow);
 
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
@@ -1050,8 +1052,8 @@ function drawChemLinks() {
       line.setAttribute('y2', p2.y);
       line.setAttribute('stroke', stroke);
       line.setAttribute('stroke-linecap', 'round');
-      line.setAttribute('stroke-width', str >= 3 ? 4 : str >= 1 ? 3 : 2);
-      if (dasharray) line.setAttribute('stroke-dasharray', dasharray);
+      line.setAttribute('stroke-opacity', '0.95');
+      line.setAttribute('stroke-width', str >= 3 ? 2.5 : str >= 1 ? 2 : 1.5);
       svg.appendChild(line);
     }
   }
