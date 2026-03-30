@@ -943,7 +943,7 @@ const FORMATION_EDGES = {
   '4-2-3-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CDM1'],['LB','LM'],['CB1','CB2'],['CB1','CDM1'],['CB2','RB'],['CB2','CDM2'],['RB','CDM2'],['RB','RM'],['CDM1','CDM2'],['CDM1','LM'],['CDM1','CAM'],['CDM2','RM'],['CDM2','CAM'],['LM','CAM'],['LM','ST'],['CAM','RM'],['CAM','ST'],['RM','ST']],
   '4-1-4-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','LM'],['CB1','CB2'],['CB1','CDM'],['CB1','CM1'],['CB2','RB'],['CB2','CDM'],['CB2','CM2'],['RB','RM'],['CDM','CM1'],['CDM','CM2'],['LM','CM1'],['LM','ST'],['CM1','CM2'],['CM1','ST'],['CM2','RM'],['CM2','ST'],['RM','ST']],
   '4-5-1': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','LM'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM3'],['RB','RM'],['LM','CM1'],['LM','ST'],['CM1','CM2'],['CM2','CM3'],['CM2','ST'],['CM3','RM'],['CM3','ST'],['RM','ST']],
-  '3-4-3': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['CB1','CB2'],['CB1','LM'],['CB1','CM1'],['CB2','CB3'],['CB2','CM1'],['CB2','CM2'],['CB2','ST'],['CB3','RM'],['CB3','CM2'],['LM','CM1'],['LM','LW'],['CM1','CM2'],['CM1','LW'],['CM1','ST'],['CM2','RM'],['CM2','RW'],['CM2','ST'],['RM','RW'],['LW','ST'],['ST','RW']],
+  '3-4-3': [['GK','CB1'],['GK','CB2'],['GK','CB3'],['CB1','CB2'],['CB1','LM'],['CB1','CM1'],['CB2','CB3'],['CB2','CM1'],['CB2','CM2'],['CB3','RM'],['CB3','CM2'],['LM','CM1'],['LM','LW'],['CM1','CM2'],['CM1','LW'],['CM1','ST'],['CM2','RM'],['CM2','RW'],['CM2','ST'],['RM','RW'],['LW','ST'],['ST','RW']],
   '4-3-3 (4)': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['LB','LW'],['CB1','CB2'],['CB1','CM1'],['CB2','RB'],['CB2','CM2'],['RB','CAM'],['RB','RW'],['CM1','CM2'],['CM1','LW'],['CM1','CAM'],['CM2','CAM'],['CM2','ST'],['CAM','LW'],['CAM','ST'],['CAM','RW'],['LW','ST'],['ST','RW']],
   '4-1-2-1-2': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CM1'],['CB1','CB2'],['CB1','CDM'],['CB1','CM1'],['CB2','RB'],['CB2','CDM'],['CB2','CM2'],['RB','CM2'],['CDM','CM1'],['CDM','CM2'],['CDM','CAM'],['CM1','CAM'],['CM1','ST1'],['CM2','CAM'],['CM2','ST2'],['CAM','ST1'],['CAM','ST2'],['ST1','ST2']],
   '4-2-2-2': [['GK','CB1'],['GK','CB2'],['LB','CB1'],['LB','CDM1'],['LB','CAM1'],['CB1','CB2'],['CB1','CDM1'],['CB2','RB'],['CB2','CDM2'],['RB','CDM2'],['RB','CAM2'],['CDM1','CDM2'],['CDM1','CAM1'],['CDM2','CAM2'],['CAM1','CAM2'],['CAM1','ST1'],['CAM2','ST2'],['ST1','ST2']],
@@ -1040,11 +1040,12 @@ function drawChemLinks() {
 
       const cardA = squad[slot] ? cards.find(c => c.id === squad[slot]) : null;
       const cardB = squad[nb] ? cards.find(c => c.id === squad[nb]) : null;
-      if (!cardA || !cardB) continue;
-      const str = linkStrength(cardA, cardB);
+      const isEmptyLink = !cardA || !cardB;
+      const str = isEmptyLink ? 0 : linkStrength(cardA, cardB);
 
       let stroke;
-      if (str >= 5) stroke = '#6ee7b7';
+      if (isEmptyLink) stroke = 'rgba(255,255,255,0.26)';
+      else if (str >= 5) stroke = '#6ee7b7';
       else if (str >= 2.5) stroke = '#ffd166';
       else stroke = 'rgba(255,255,255,0.55)';
 
@@ -1053,24 +1054,28 @@ function drawChemLinks() {
       const length = Math.hypot(dx, dy);
       const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-      const glow = document.createElement('div');
-      glow.className = 'chem-link glow';
-      glow.style.left = `${p1.x}px`;
-      glow.style.top = `${p1.y}px`;
-      glow.style.width = `${length}px`;
-      glow.style.height = `${str >= 5 ? 5 : str >= 2.5 ? 4 : 3}px`;
-      glow.style.background = stroke;
-      glow.style.transform = `translateY(-50%) rotate(${angle}deg)`;
-      overlay.appendChild(glow);
+      if (!isEmptyLink) {
+        const glow = document.createElement('div');
+        glow.className = 'chem-link glow';
+        glow.style.left = `${p1.x}px`;
+        glow.style.top = `${p1.y}px`;
+        glow.style.width = `${length}px`;
+        glow.style.height = `${str >= 5 ? 5 : str >= 2.5 ? 4 : 3}px`;
+        glow.style.background = stroke;
+        glow.style.transform = `translateY(-50%) rotate(${angle}deg)`;
+        overlay.appendChild(glow);
+      }
 
       const line = document.createElement('div');
       line.className = 'chem-link';
       line.style.left = `${p1.x}px`;
       line.style.top = `${p1.y}px`;
       line.style.width = `${length}px`;
-      line.style.height = `${str >= 5 ? 2.5 : str >= 2.5 ? 2 : 1.5}px`;
-      line.style.background = stroke;
-      line.style.opacity = '0.95';
+      line.style.height = `${isEmptyLink ? 2 : str >= 5 ? 2.5 : str >= 2.5 ? 2 : 1.5}px`;
+      line.style.background = isEmptyLink
+        ? `repeating-linear-gradient(to right, ${stroke} 0 7px, transparent 7px 13px)`
+        : stroke;
+      line.style.opacity = isEmptyLink ? '0.8' : '0.95';
       line.style.transform = `translateY(-50%) rotate(${angle}deg)`;
       overlay.appendChild(line);
     }
