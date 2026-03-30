@@ -142,7 +142,7 @@
         ["CB2", "RB"], ["CB2", "CM2"],
         ["RB", "CM2"],
         ["CM1", "CM2"], ["CM1", "LW"], ["CM1", "CAM"],
-        ["CM2", "CAM"],
+        ["CM2", "CAM"], ["CM2", "RW"],
         ["CAM", "LW"], ["CAM", "ST"], ["CAM", "RW"],
         ["LW", "ST"], ["ST", "RW"]
       ]
