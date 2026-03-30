@@ -66,8 +66,9 @@
   .formation-row {
     display: flex;
     align-items: center;
-    padding: 8px 16px;
+    padding: 8px 16px 4px;
     gap: 12px;
+    flex-wrap: wrap;
   }
   .formation-btn {
     padding: 6px 16px;
@@ -173,8 +174,6 @@
     z-index: 0;
     background:
       radial-gradient(circle at 50% 50%, rgba(255,255,255,0.28) 0 3px, transparent 4px),
-      linear-gradient(rgba(255,255,255,0.22), rgba(255,255,255,0.22)),
-      linear-gradient(rgba(255,255,255,0.22), rgba(255,255,255,0.22)),
       linear-gradient(
         to bottom,
         transparent calc(50% - 1px),
@@ -186,14 +185,10 @@
     background-repeat: no-repeat;
     background-size:
       6px 6px,
-      42% 18%,
-      42% 18%,
       100% 100%,
       100% 100%;
     background-position:
       center,
-      center top 12px,
-      center bottom 12px,
       center,
       center;
   }
@@ -557,11 +552,11 @@
   <div class="formation-row">
     <button class="formation-btn" id="formationPickerBtn" onclick="openFormationModal()">4-4-2 ▾</button>
     <span id="chemDisplay" style="font-size:13px;font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span>
+    <span id="avgRating" style="font-size:13px;color:var(--gold);font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span>
   </div>
 
   <!-- Pitch -->
   <div class="pitch-container">
-    <div style="display:flex;justify-content:flex-end;padding:4px 8px 0;"><span id="avgRating" style="font-size:13px;color:var(--gold);font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span></div>
     <div class="pitch" id="pitch">
       <div class="loading"><div class="spinner"></div> Загрузка...</div>
     </div>
@@ -1032,10 +1027,21 @@ function drawChemLinks() {
       const str = linkStrength(cardA, cardB);
 
       let stroke, dasharray = '';
-      if (!cardA || !cardB) { stroke = 'rgba(255,255,255,0.15)'; dasharray = '4,4'; }
+      if (!cardA || !cardB) { stroke = 'rgba(255,255,255,0.14)'; dasharray = '4,4'; }
       else if (str === 3) stroke = '#52b788';
       else if (str === 1) stroke = '#f0c040';
-      else stroke = 'rgba(255,255,255,0.2)';
+      else stroke = 'rgba(255,255,255,0.28)';
+
+      const glow = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      glow.setAttribute('x1', p1.x);
+      glow.setAttribute('y1', p1.y);
+      glow.setAttribute('x2', p2.x);
+      glow.setAttribute('y2', p2.y);
+      glow.setAttribute('stroke', stroke);
+      glow.setAttribute('stroke-linecap', 'round');
+      glow.setAttribute('stroke-opacity', cardA && cardB ? '0.35' : '0.2');
+      glow.setAttribute('stroke-width', str >= 3 ? 7 : str >= 1 ? 5 : 3);
+      svg.appendChild(glow);
 
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
       line.setAttribute('x1', p1.x);
@@ -1043,7 +1049,8 @@ function drawChemLinks() {
       line.setAttribute('x2', p2.x);
       line.setAttribute('y2', p2.y);
       line.setAttribute('stroke', stroke);
-      line.setAttribute('stroke-width', str >= 3 ? 3.5 : str >= 1 ? 2.5 : 1.5);
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('stroke-width', str >= 3 ? 4 : str >= 1 ? 3 : 2);
       if (dasharray) line.setAttribute('stroke-dasharray', dasharray);
       svg.appendChild(line);
     }
@@ -1072,7 +1079,7 @@ function renderPitch() {
   }
 
   updateAvgRating();
-  requestAnimationFrame(() => { drawChemLinks(); });
+  requestAnimationFrame(() => requestAnimationFrame(drawChemLinks));
 }
 
 function updateAvgRating() {
