@@ -148,7 +148,7 @@ def compute_team_chemistry(
         if same_nation and same_league:
             return 3
         if same_nation or same_league:
-            return 1
+            return 2
         return 0
 
     total_chem = 0

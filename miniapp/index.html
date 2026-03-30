@@ -967,7 +967,7 @@ function linkStrength(cardA, cardB) {
   const sameNation = cardA.nationality && cardB.nationality && cardA.nationality === cardB.nationality;
   const sameLeague = cardA.league_name && cardB.league_name && cardA.league_name === cardB.league_name;
   if (sameNation && sameLeague) return 3;
-  if (sameNation || sameLeague) return 1;
+  if (sameNation || sameLeague) return 2;
   return 0;
 }
 
