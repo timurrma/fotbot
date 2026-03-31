@@ -986,7 +986,7 @@ function linkStrength(cardA, cardB) {
   const sameNation = cardA.nationality && cardB.nationality && cardA.nationality === cardB.nationality;
   const sameLeague = cardA.league_name && cardB.league_name && cardA.league_name === cardB.league_name;
   if (sameNation && sameLeague) return 5;
-  if (sameNation || sameLeague) return 2.5;
+  if (sameNation || sameLeague) return 3;
   return 0;
 }
 
@@ -1061,7 +1061,7 @@ function drawChemLinks() {
       let stroke;
       if (isEmptyLink) stroke = 'rgba(255,255,255,0.26)';
       else if (str >= 5) stroke = '#6ee7b7';
-      else if (str >= 2.5) stroke = '#ffd166';
+      else if (str >= 3) stroke = '#ffd166';
       else stroke = 'rgba(255,255,255,0.55)';
 
       const dx = p2.x - p1.x;
@@ -1075,7 +1075,7 @@ function drawChemLinks() {
         glow.style.left = `${p1.x}px`;
         glow.style.top = `${p1.y}px`;
         glow.style.width = `${length}px`;
-        glow.style.height = `${str >= 5 ? 5 : str >= 2.5 ? 4 : 3}px`;
+        glow.style.height = `${str >= 5 ? 5 : str >= 3 ? 4 : 3}px`;
         glow.style.background = stroke;
         glow.style.transform = `translateY(-50%) rotate(${angle}deg)`;
         overlay.appendChild(glow);
@@ -1086,7 +1086,7 @@ function drawChemLinks() {
       line.style.left = `${p1.x}px`;
       line.style.top = `${p1.y}px`;
       line.style.width = `${length}px`;
-      line.style.height = `${isEmptyLink ? 2 : str >= 5 ? 2.5 : str >= 2.5 ? 2 : 1.5}px`;
+      line.style.height = `${isEmptyLink ? 2 : str >= 5 ? 2.5 : str >= 3 ? 2 : 1.5}px`;
       line.style.background = isEmptyLink
         ? `repeating-linear-gradient(to right, ${stroke} 0 7px, transparent 7px 13px)`
         : stroke;

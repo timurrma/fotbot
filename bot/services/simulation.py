@@ -100,7 +100,7 @@ def compute_team_chemistry(
     Вычисляет химию команды 0-100 (FIFA-like).
 
     Per-player chemistry = min(10, sum(link_strength для каждого соседа))
-    - link: клуб = 5, нация+лига = 5, нация ИЛИ лига = 2.5, ничего = 0
+    - link: клуб = 5, нация+лига = 5, нация ИЛИ лига = 3, ничего = 0
 
     team_chem = sum(player_chems) / 110 * 100
 
@@ -124,7 +124,7 @@ def compute_team_chemistry(
         if same_nation and same_league:
             return 5.0
         if same_nation or same_league:
-            return 2.5
+            return 3.0
         return 0.0
 
     total_chem = 0.0
