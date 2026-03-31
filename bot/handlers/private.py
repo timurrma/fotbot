@@ -66,19 +66,17 @@ async def cmd_start(message: Message) -> None:
         await send_pack_with_photos(message.bot, message.chat.id, username, players, "starter")
         await send_pack_with_photos(message.bot, settings.group_id, username, players, "starter")
 
-        # Бонус: 4 пака одной случайной нации
+        # Бонус: 4 пака одной случайной нации — добавляем в очередь
         nation_pack = random.choice(["russia", "brazil", "france", "england", "turkey", "saudi"])
         nation_names = {
             "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия",
             "france": "🇫🇷 Франция", "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Англия",
             "turkey": "🇹🇷 Турция", "saudi": "🇸🇦 Саудовская Аравия",
         }
-        await message.answer(f"🎁 Бонус: 4 пака {nation_names[nation_pack]}!")
         async with AsyncSessionLocal() as session:
             for _ in range(4):
-                nation_players = await open_pack(session, message.from_user.id, pack_type=nation_pack)
-                await send_pack_with_photos(message.bot, message.chat.id, username, nation_players, nation_pack)
-                await asyncio.sleep(1)
+                await give_pending_pack(session, user_id, pack_type=nation_pack)
+        await message.answer(f"🎁 Бонус: 4 пака {nation_names[nation_pack]} добавлены в очередь! Открой их через /packs")
     else:
         await message.answer(
             "👋 С возвращением!\n\n"
