@@ -75,6 +75,11 @@ with open(_GRAPH_PATH, encoding="utf-8") as _f:
     _FORMATION_GRAPHS: dict = json.load(_f)["formations"]
 
 
+def get_formation_graphs() -> dict:
+    """Возвращает графы соседства формаций из единого JSON-источника."""
+    return _FORMATION_GRAPHS
+
+
 def get_slot_neighbors(formation: str) -> dict[str, set[str]]:
     """
     Возвращает словарь {slot_name: set of neighbor slot_names} для заданной формации.

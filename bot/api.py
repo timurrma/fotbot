@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from bot.config import settings
 from bot.db.models import UserCard, UserSquad, PackHistory, Player, TransferListing, TransferOffer, Whitelist
 from bot.db.session import AsyncSessionLocal
-from bot.services.simulation import compute_penalty, compute_team_chemistry
+from bot.services.simulation import compute_penalty, compute_team_chemistry, get_formation_graphs
 
 _SLOT_TO_POS = {
     "GK": "GK",
@@ -612,6 +612,11 @@ async def get_squad_full(request: web.Request) -> web.Response:
     return web.json_response({"formation": squad.formation, "slots": slots_out})
 
 
+async def get_formation_graphs_handler(request: web.Request) -> web.Response:
+    """GET /api/formation-graphs — графы соседства формаций для миниаппа."""
+    return web.json_response({"formations": get_formation_graphs()})
+
+
 async def get_users(request: web.Request) -> web.Response:
     """GET /api/users — список игроков вайтлиста."""
     async with AsyncSessionLocal() as session:
@@ -675,6 +680,7 @@ def create_api_app() -> web.Application:
     app.middlewares.append(cors_middleware)
     app.router.add_get("/api/cards", get_cards)
     app.router.add_get("/api/squad", get_squad)
+    app.router.add_get("/api/formation-graphs", get_formation_graphs_handler)
     app.router.add_post("/api/squad", save_squad)
     app.router.add_options("/api/squad", lambda r: web.Response())
     app.router.add_get("/api/photo", proxy_photo)
