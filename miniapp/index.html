@@ -616,7 +616,10 @@
   <div style="padding: 12px 16px;">
     <div class="section-title" style="margin-bottom:8px">👥 Состав соперника</div>
     <div id="opponentSelect" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px"></div>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:4px;"><span id="oppAvgRating" style="font-size:13px;color:var(--gold);font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:4px;">
+      <span id="oppChemDisplay" style="font-size:13px;font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span>
+      <span id="oppAvgRating" style="font-size:13px;color:var(--gold);font-weight:700;background:rgba(0,0,0,0.4);padding:2px 8px;border-radius:8px;"></span>
+    </div>
     <div id="opponentPitch"></div>
   </div>
 </div>
@@ -1572,6 +1575,33 @@ function renderOpponentPitch(data) {
   const oppRatings = (data.slots || []).filter(s => mainSlots.includes(s.slot)).map(s => s.player.effective_rating ?? s.player.rating ?? s.player.overall_rating);
   const oppAvg = oppRatings.length ? (oppRatings.reduce((a,b)=>a+b,0)/oppRatings.length).toFixed(1) : null;
   document.getElementById('oppAvgRating').textContent = oppAvg ? `★ ${oppAvg}` : '';
+
+  // Химия соперника
+  const oppFormation = data.formation || '4-4-2';
+  const oppNeighbors = getSlotNeighbors(oppFormation);
+  const oppSlotMap = {};
+  (data.slots || []).forEach(s => { oppSlotMap[s.slot] = s.player; });
+  let oppChemTotal = 0;
+  const oppAllSlots = (FORMATIONS[oppFormation] || []).flat();
+  for (const slot of oppAllSlots) {
+    const cardA = oppSlotMap[slot];
+    if (!cardA) continue;
+    const nbSlots = [...(oppNeighbors[slot] || [])].filter(nb => oppSlotMap[nb]);
+    let raw = 0;
+    for (const nb of nbSlots) {
+      raw += linkStrength(cardA, oppSlotMap[nb]);
+    }
+    oppChemTotal += Math.min(10, raw);
+  }
+  const oppChem = Math.round(oppChemTotal / 110 * 100);
+  const oppChemEl = document.getElementById('oppChemDisplay');
+  if (oppChem > 0) {
+    const color = oppChem >= 75 ? '#52b788' : oppChem >= 50 ? '#f0c040' : '#e74c3c';
+    oppChemEl.style.color = color;
+    oppChemEl.textContent = `⚗️ ${oppChem}`;
+  } else {
+    oppChemEl.textContent = '';
+  }
 }
 
 // ─── Transfer market ──────────────────────────────────────────────────────────
