@@ -983,6 +983,8 @@ function getSlotNeighbors(form) {
 
 function linkStrength(cardA, cardB) {
   if (!cardA || !cardB) return 0;
+  // Legend league → max chemistry with everyone
+  if (cardA.league_name === 'Легенды' || cardB.league_name === 'Легенды') return 5;
   if (cardA.club && cardB.club && cardA.club === cardB.club) return 5;
   const sameNation = cardA.nationality && cardB.nationality && cardA.nationality === cardB.nationality;
   const sameLeague = cardA.league_name && cardB.league_name && cardA.league_name === cardB.league_name;

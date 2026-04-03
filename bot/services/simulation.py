@@ -121,6 +121,9 @@ def compute_team_chemistry(
     def link_strength(a: Player, b: Player) -> float:
         if a.id < 0 or b.id < 0:
             return 0.0
+        # Легенды → max chemistry with everyone
+        if a.league_name == "Легенды" or b.league_name == "Легенды":
+            return 5.0
         same_club = bool(a.club and b.club and a.club == b.club)
         same_nation = bool(a.nationality and b.nationality and a.nationality == b.nationality)
         same_league = bool(a.league_name and b.league_name and a.league_name == b.league_name)
