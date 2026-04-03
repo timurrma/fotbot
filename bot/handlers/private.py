@@ -67,9 +67,10 @@ async def cmd_start(message: Message) -> None:
         await send_pack_with_photos(message.bot, settings.group_id, username, players, "starter")
 
         # Бонус: 4 пака одной случайной нации — добавляем в очередь
-        nation_pack = random.choice(["russia", "brazil", "france", "england", "turkey", "saudi"])
+        nation_pack = random.choice(["russia", "brazil", "spain", "germany", "france", "england", "turkey", "saudi"])
         nation_names = {
             "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия",
+            "spain": "🇪🇸 Испания", "germany": "🇩🇪 Германия",
             "france": "🇫🇷 Франция", "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Англия",
             "turkey": "🇹🇷 Турция", "saudi": "🇸🇦 Саудовская Аравия",
         }

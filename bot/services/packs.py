@@ -38,6 +38,14 @@ PACK_WEIGHTS = {
         "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
         "weights": [23, 58, 17, 2],
     },
+    "spain": {
+        "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
+        "weights": [23, 58, 17, 2],
+    },
+    "germany": {
+        "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
+        "weights": [23, 58, 17, 2],
+    },
     "france": {
         "ranges": [(65, 74), (75, 79), (80, 84), (85, 99)],
         "weights": [68, 23, 7, 2],
@@ -165,6 +173,10 @@ async def open_pack(
         players_out = await _open_russia_pack(session, used_player_ids)
     elif pack_type == "brazil":
         players_out = await _open_brazil_pack(session, used_player_ids)
+    elif pack_type == "spain":
+        players_out = await _open_nation_pack(session, used_player_ids, "Spain", "spain")
+    elif pack_type == "germany":
+        players_out = await _open_nation_pack(session, used_player_ids, "Germany", "germany")
     elif pack_type == "france":
         players_out = await _open_nation_pack(session, used_player_ids, "France", "france")
     elif pack_type == "england":
@@ -539,7 +551,7 @@ async def has_starter_pack(session: AsyncSession, user_id: int) -> bool:
 
 def format_pack_announcement(username: str, players: list[Player], pack_type: str = "weekly") -> str:
     """Формирует текстовый анонс открытия пака (без фото)."""
-    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "france": "🇫🇷 Франция", "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Англия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний", "saudi": "🇸🇦 Саудовская лига", "record": "🏆 Рекорд", "consolation": "🤝 Утешающий", "weekly_tournament": "🏅 Еженедельный турнир"}
+    stars = {"starter": "🌟 Стартовый", "weekly": "🎴", "special": "💎 Спец", "russia": "🇷🇺 Россия", "brazil": "🇧🇷 Бразилия", "spain": "🇪🇸 Испания", "germany": "🇩🇪 Германия", "france": "🇫🇷 Франция", "england": "🏴󠁧󠁢󠁥󠁮󠁧󠁿 Англия", "turkey": "🇹🇷 Турция", "morning": "🌅 Утренний", "saudi": "🇸🇦 Саудовская лига", "record": "🏆 Рекорд", "consolation": "🤝 Утешающий", "weekly_tournament": "🏅 Еженедельный турнир"}
     header = stars.get(pack_type, "🎴")
 
     lines = [f"{header} @{username} открыл пак!\n"]

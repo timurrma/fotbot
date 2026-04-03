@@ -86,9 +86,11 @@ PACK_MENU = [
     ("special",   "специальный",         "5 карточек (65-74: 30%, 75-84: 35%, 85+: 35%)"),
     ("russia",    "🇷🇺 Россия",          "2 русских игрока (1% Аршавин)"),
     ("brazil",    "🇧🇷 Бразилия",        "2 бразильца"),
+    ("spain",     "🇪🇸 Испания",         "2 испанца"),
+    ("germany",   "🇩🇪 Германия",        "2 немца"),
     ("turkey",    "🇹🇷 Турция",          "2 турка (1% Арда Туран)"),
     ("saudi",     "🇸🇦 Саудовская лига", "2 игрока Saudi Pro League"),
-    ("minirandom","мини-рандом",          "рандомно: russia/brazil/france/england/turkey/saudi"),
+    ("minirandom","мини-рандом",          "рандомно: russia/brazil/spain/germany/france/england/turkey/saudi"),
     ("morning",   "🌅 утренний",         "4 карточки (до 70: 20%, 70-75: 20%, 76-80: 50%, 81-85: 8%, 86+: 2%)"),
     ("record",      "🏆 Рекорд",           "3 карточки (65-74: 20%, 75-84: 75%, 85+: 5%)"),
     ("consolation",        "🤝 Утешающий",            "2 карточки (70-75: 20%, 76-80: 45%, 81-82: 30%, 83+: 5%)"),
@@ -167,7 +169,7 @@ async def cmd_givepack(message: Message) -> None:
 
     if pack_type == "minirandom":
         import random as _random
-        pack_type = _random.choice(["russia", "brazil", "france", "england", "turkey", "saudi"])
+        pack_type = _random.choice(["russia", "brazil", "spain", "germany", "france", "england", "turkey", "saudi"])
         pack_name = f"мини-рандом → {pack_type}"
 
     async with AsyncSessionLocal() as session:
